@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
+import { countDirty, getMeta, setMeta, viderBase } from './db';
+import { recharger } from './hooks';
 import { api, saveSession, type User } from './session';
 
 interface Props {
@@ -35,6 +37,17 @@ export function Auth({ onDone, reconnect }: Props) {
       const path = configured ? '/api/login' : '/api/setup';
       const body = configured ? { name, password } : { name, password, code: needsCode ? code : '' };
       const r = await api<{ token: string; user: User }>(path, body);
+      // téléphone partagé : les données de la personne précédente sont retirées avant d'afficher celles de la nouvelle
+      const dernier = await getMeta<string>('localUser');
+      if (dernier && dernier.toLowerCase() !== r.user.name.toLowerCase()) {
+        if ((await countDirty()) > 0) {
+          setError(`Ce téléphone contient des saisies de ${dernier} pas encore envoyées. Reconnectez-vous d'abord avec ce compte pour les envoyer.`);
+          return;
+        }
+        await viderBase();
+        await recharger();
+      }
+      await setMeta('localUser', r.user.name);
       saveSession(r.token, r.user);
       onDone(r.user);
     } catch (err) {

@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { dataOf, useItems } from '../hooks';
 import { fmtDate, fmtDec, fmtFcfa, fmtInt, today } from '../format';
+import { resumeLigne } from '../gestion/resume';
 import { clientDe, compteDuMode, creances, oeufsVendus, totalLignes } from '../gestion/calculs';
 import { ACTIVITES, type Activite, type Client, type LigneVente, type Paiement, type Vente } from '../gestion/types';
 import { stockOeufs } from '../poules/calculs';
@@ -8,6 +9,9 @@ import { dernierPoids, finDelaiAttente } from '../ruminants/calculs';
 import { libelleAnimal, useRuminants } from '../ruminants/donnees';
 import { ACTIVITE_ESPECE, type MvtAnimal } from '../ruminants/types';
 import type { MvtOeufs, Ramassage } from '../poules/types';
+import { MIME_PDF, partager } from '../partage';
+import { construirePdf } from '../rapports/pdf';
+import { construireRecu } from '../rapports/rapport';
 import { newId, saveRecord } from '../sync';
 import { Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
 import { go } from '../hooks';
@@ -24,13 +28,6 @@ const MODES: Array<[Paiement['mode'], string]> = [
   ['mobile_money', 'Mobile Money'],
   ['virement', 'Virement']
 ];
-
-const resumeLigne = (l: LigneVente) =>
-  l.article === 'oeufs'
-    ? `${fmtInt(l.quantite)} ${l.unite === 'plateau' ? 'plateau(x) d’œufs' : 'œuf(s)'}`
-    : l.article === 'animal'
-      ? `${l.libelle}${l.unite === 'kg' ? ` (${fmtDec(l.quantite, 0)} kg à ${fmtFcfa(l.prixUnitaire)}/kg)` : ''}`
-      : `${fmtInt(l.quantite)} ${l.libelle || (l.article === 'fumier' ? 'fientes / fumier' : l.article)}`;
 
 export function Ventes() {
   const ventes = useItems<Vente>('vente');
@@ -315,6 +312,11 @@ export function ClientDetail({ id }: { id: string }) {
     for (const p of allPaiements.filter((x) => x.venteId === v.id)) await saveRecord('paiement', p.id, dataOf(p), true);
     setMessage('Vente supprimée');
   }
+  async function recu(v: (typeof ventes)[number]) {
+    const paye = allPaiements.filter((p) => p.venteId === v.id).reduce((s, p) => s + p.montant, 0);
+    const doc = construireRecu(v, c!.nom, paye, du, today());
+    await partager(construirePdf(doc), `recu-${c!.nom.replace(/[^A-Za-z0-9]+/g, '-')}-${v.date}.pdf`, MIME_PDF, `Reçu de vente Ferme360 - ${c!.nom} - ${fmtFcfa(v.total)}`);
+  }
   async function supprimerPaiement(p: (typeof paiements)[number]) {
     if (!window.confirm('Supprimer ce paiement ?')) return;
     await saveRecord('paiement', p.id, dataOf(p), true);
@@ -344,6 +346,7 @@ export function ClientDetail({ id }: { id: string }) {
           <li key={ev.cle}>
             <div class="ligne"><span>{ev.texte}</span><small>{fmtDate(ev.date)}</small></div>
             {ev.vente && <small>{ev.vente.lignes.map((l) => (l.article === 'animal' ? resumeLigne(l) : `${resumeLigne(l)} à ${fmtFcfa(l.prixUnitaire)}`)).join(' · ')}</small>}
+            {ev.vente && <button type="button" class="lien vert" onClick={() => void recu(ev.vente!)}>Reçu PDF (partager par WhatsApp)</button>}
             <button type="button" class="lien" onClick={() => void (ev.vente ? supprimerVente(ev.vente) : supprimerPaiement(ev.paiement!))}>Supprimer</button>
           </li>
         ))}

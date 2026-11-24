@@ -1,12 +1,7 @@
 import { joursEntre } from '../format';
+import { REGLAGES } from '../reglages';
 import type { Aliment, Bande, Mortalite, MvtOeufs, Ramassage } from './types';
 
-// Seuils par défaut des alertes (à rendre modifiables dans les paramètres, étape 6)
-export const SEUIL_CHUTE_PONTE_POINTS = 5;
-export const JOURS_CHUTE_PONTE = 3;
-export const SEUIL_MORTALITE_JOUR_POURCENT = 1;
-export const SEUIL_MORTALITE_JOUR_MIN = 2;
-export const POIDS_OEUF_KG = 0.06;
 
 export const oeufsPondus = (r: Ramassage) => r.bons + r.feles + r.casses;
 
@@ -55,7 +50,7 @@ export function indicateurs(b: Bande, ramassages: Ramassage[], morts: Mortalite[
   const alimentKg = aliments.reduce((s, a) => s + a.kg, 0);
   const dates = datesRamassage(ramassages);
   const derniereDate = dates.length ? dates[dates.length - 1] : null;
-  const kgOeufs = oeufsCumules * POIDS_OEUF_KG;
+  const kgOeufs = oeufsCumules * (REGLAGES.poidsOeufG / 1000);
   return {
     effectif: effectifActuel(b, morts),
     mortalitePct: b.effectifInitial > 0 ? (morts.filter((m) => m.type === 'mort').reduce((s, m) => s + m.nombre, 0) / b.effectifInitial) * 100 : 0,
@@ -74,11 +69,11 @@ export function alertes(b: Bande, ramassages: Ramassage[], morts: Mortalite[]): 
   const dates = datesRamassage(ramassages);
   if (dates.length >= 2) {
     const dernier = dates[dates.length - 1];
-    const avant = [...dates].reverse().find((d) => joursEntre(d, dernier) >= JOURS_CHUTE_PONTE);
+    const avant = [...dates].reverse().find((d) => joursEntre(d, dernier) >= REGLAGES.chutePonteJours);
     if (avant) {
       const t1 = tauxPonteJour(b, ramassages, morts, dernier);
       const t0 = tauxPonteJour(b, ramassages, morts, avant);
-      if (t1 !== null && t0 !== null && t0 - t1 > SEUIL_CHUTE_PONTE_POINTS) {
+      if (t1 !== null && t0 !== null && t0 - t1 > REGLAGES.chutePonteSeuil) {
         out.push(`Chute de ponte : ${(t0 - t1).toFixed(1).replace('.', ',')} points en ${joursEntre(avant, dernier)} jours`);
       }
     }
@@ -87,7 +82,7 @@ export function alertes(b: Bande, ramassages: Ramassage[], morts: Mortalite[]): 
   const parJour = new Map<string, number>();
   for (const m of morts.filter((x) => x.type === 'mort')) parJour.set(m.date, (parJour.get(m.date) ?? 0) + m.nombre);
   for (const [date, n] of parJour) {
-    const seuil = Math.max(SEUIL_MORTALITE_JOUR_MIN, (effectifAu(b, morts, date) + n) * (SEUIL_MORTALITE_JOUR_POURCENT / 100));
+    const seuil = Math.max(REGLAGES.mortaliteJourMin, (effectifAu(b, morts, date) + n) * (REGLAGES.mortaliteJourPct / 100));
     if (n > seuil) out.push(`Mortalité élevée le ${date.split('-').reverse().join('/')} : ${n} poules`);
   }
   return out;

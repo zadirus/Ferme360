@@ -41,3 +41,16 @@ Avant de livrer : `npm run build` doit passer.
 - Embouche : GMQ = (dernier poids − premier poids) ÷ jours × 1000, coût de revient du kg vif = (achat + rations + soins) ÷ somme des derniers poids ; objectif de poids et de date (Tabaski) sur le lot.
 - Non fait : pâturage par parc, photos, traction et lait, proposition de réforme, mortalité avant sevrage.
 - Test de parcours : `npx wrangler dev --port 8791` puis `BASE=http://localhost:8791 node e2e/etape5.cjs`.
+
+## Profils, réglages, rapports, sauvegarde (étape 6)
+- Droits : `src/droits.ts` (partagé serveur + application). Profils : `owner`, `gerant`, `ouvrier`, `veterinaire`. Le serveur filtre la LECTURE (SQL `collection IN …`) et refuse l'ÉCRITURE (`rejected` dans la réponse de `/api/sync`) ; l'application masque en plus ce qui est interdit. Aucune donnée d'argent n'est jamais envoyée à l'ouvrier ni au vétérinaire.
+- Le rôle est relu en base à chaque requête (`readSession`) : désactiver un compte ou changer son profil agit tout de suite. Colonne `users.active` ajoutée par migration automatique (`ensureSchema`).
+- Comptes : `/api/users` (liste, création), `/api/users/update` (profil, actif, mot de passe), `/api/password` (le sien) ; réservés au propriétaire sauf le dernier. Il n'y a qu'un propriétaire.
+- Journal : table `journal` (qui, quand, valeur avant) alimentée par `/api/sync` quand un enregistrement déjà connu du serveur change ou est supprimé ; conservé 24 mois ; `/api/journal` (propriétaire). Des modifications faites entre deux synchronisations comptent pour une seule.
+- Réglages : collection `reglage` (id `reglages-ferme`), appliqués par `appliquerReglages` (src/reglages.ts) ; les calculs lisent `REGLAGES` au moment de l'appel.
+- Coût de l'aliment : calculé à la lecture avec le coût moyen d'achat (`coutDistribution`), car l'ouvrier ne voit pas les achats.
+- Rapports : `src/rapports/` — `pdf.ts` et `xlsx.ts` (+ `zip.ts`) sont écrits à la main, sans bibliothèque ; `rapport.ts` construit les données du mois ; reçu de vente en PDF depuis la fiche client. Partage via `navigator.share` (fichiers), sinon téléchargement.
+- Sauvegarde : export/import JSON dans l'application (`Sauvegarde.tsx`) ; côté Cloudflare, D1 Time Travel (7 jours en gratuit, 30 en payant). R2 volontairement NON utilisé (peut exiger une carte bancaire et ferait échouer le déploiement).
+- Téléphone partagé : se connecter avec un autre nom vide les données locales (refusé s'il reste des saisies non envoyées).
+- Tests : `npm test` ; `e2e/droits-api.cjs` (API), `e2e/etape4.cjs`, `etape5.cjs`, `etape6.cjs` (deux serveurs : `BASE` et `BASE2`).
+- Non fait : notifications téléphone application fermée, tâches et présences du personnel, sauvegarde automatique vers R2.

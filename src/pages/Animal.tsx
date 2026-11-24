@@ -1,13 +1,15 @@
 import { useState } from 'preact/hooks';
-import { dataOf, go, type Item } from '../hooks';
+import { dataOf, go, useRole, type Item } from '../hooks';
+import { peut, peutEcrire } from '../droits';
 import { ageEnMois, fmtDate, fmtDec, fmtFcfa, joursEntre, today } from '../format';
 import { COMPTES, type Compte, type Depense } from '../gestion/types';
 import { dernierPoids, finDelaiAttente, gmq, gmqAnimal, miseBasPrevue, poidsAnimal } from '../ruminants/calculs';
 import { libelleAnimal, useRuminants } from '../ruminants/donnees';
 import {
-  ACTIVITE_ESPECE, GESTATION_JOURS, ICONE_ESPECE, NOM_ESPECE, NOM_SOIN,
+  ACTIVITE_ESPECE, ICONE_ESPECE, NOM_ESPECE, NOM_SOIN,
   type Animal, type Espece, type MiseBas, type MvtAnimal, type Pesee, type Repro, type Soin
 } from '../ruminants/types';
+import { gestationParDefaut } from '../reglages';
 import { newId, saveRecord } from '../sync';
 import { Alertes, Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
 
@@ -19,6 +21,9 @@ export function AnimalDetail({ id }: { id: string }) {
   const r = useRuminants();
   const [action, setAction] = useState<Action | null>(null);
   const [message, setMessage] = useState('');
+  const role = useRole();
+  const argent = peut(role, 'argent');
+  const ecrit = (c: string) => peutEcrire(role, c);
   const a = r.animaux.find((x) => x.id === id);
   if (!a) return (<section><Retour vers="/elevage" texte="Élevage" /><p class="intro">Animal introuvable.</p></section>);
 
@@ -77,21 +82,21 @@ export function AnimalDetail({ id }: { id: string }) {
         <Stat valeur={gmqAnimal(id, r.pesees) !== null ? `${fmtDec(gmqAnimal(id, r.pesees)!, 0)} g/j` : '—'} label="GMQ depuis la 1re pesée" />
         <Stat valeur={lot ? <a href={`#/lots/${lot.id}`}>{lot.nom}</a> : 'Aucun'} label="Lot" />
         {prevue && <Stat valeur={fmtDate(prevue)} label={prevue < today() ? 'Mise bas prévue (en retard)' : 'Mise bas prévue'} />}
-        {a.origine === 'achete' && <Stat valeur={fmtFcfa(a.prixAchat)} label={`Acheté le ${fmtDate(a.dateAchat)}${a.vendeur ? ` à ${a.vendeur}` : ''}`} />}
+        {argent && a.origine === 'achete' && <Stat valeur={fmtFcfa(a.prixAchat)} label={`Acheté le ${fmtDate(a.dateAchat)}${a.vendeur ? ` à ${a.vendeur}` : ''}`} />}
       </div>
       {message && <p class="succes" role="status">{message}</p>}
 
       {present && !action && (
         <div class="actions">
-          <button class="principal" type="button" onClick={() => setAction('pesee')}><span class="e">⚖️</span>Pesée</button>
-          <button class="principal" type="button" onClick={() => setAction('soin')}><span class="e">💉</span>Soin</button>
-          {a.sexe === 'F' && <button class="principal" type="button" onClick={() => setAction('repro')}><span class="e">❤️</span>Reproduction</button>}
-          {a.sexe === 'F' && <button class="principal" type="button" onClick={() => setAction('misebas')}><span class="e">🍼</span>Mise bas</button>}
-          <button class="principal" type="button" onClick={() => setAction('lot')}><span class="e">🧺</span>Changer de lot</button>
-          <button class="principal" type="button" onClick={() => setAction('sortie')}><span class="e">🚪</span>Sortie</button>
+          {ecrit('pesee') && <button class="principal" type="button" onClick={() => setAction('pesee')}><span class="e">⚖️</span>Pesée</button>}
+          {ecrit('soin') && <button class="principal" type="button" onClick={() => setAction('soin')}><span class="e">💉</span>Soin</button>}
+          {a.sexe === 'F' && ecrit('repro') && <button class="principal" type="button" onClick={() => setAction('repro')}><span class="e">❤️</span>Reproduction</button>}
+          {a.sexe === 'F' && ecrit('misebas') && <button class="principal" type="button" onClick={() => setAction('misebas')}><span class="e">🍼</span>Mise bas</button>}
+          {ecrit('mvt_animal') && <button class="principal" type="button" onClick={() => setAction('lot')}><span class="e">🧺</span>Changer de lot</button>}
+          {ecrit('mvt_animal') && <button class="principal" type="button" onClick={() => setAction('sortie')}><span class="e">🚪</span>Sortie</button>}
         </div>
       )}
-      {present && !action && <p class="intro">Pour vendre cet animal, utilisez l'onglet Ventes.</p>}
+      {present && !action && argent && <p class="intro">Pour vendre cet animal, utilisez l'onglet Ventes.</p>}
 
       {action === 'pesee' && <PeseeForm animalId={id} onFini={fini} />}
       {action === 'soin' && <SoinForm animalId={id} lotId="" espece={a.espece} onFini={fini} />}
@@ -107,7 +112,7 @@ export function AnimalDetail({ id }: { id: string }) {
         {evts.map((e) => (
           <li key={e.cle}>
             <div class="ligne"><span>{e.texte}</span><small>{fmtDate(e.date)}</small></div>
-            {e.supprimer && <button type="button" class="lien" onClick={() => void e.supprimer!()}>Supprimer</button>}
+            {e.supprimer && ecrit({ p: 'pesee', s: 'soin', r: 'repro', b: 'misebas', m: 'mvt_animal' }[e.cle[0]] ?? '') && <button type="button" class="lien" onClick={() => void e.supprimer!()}>Supprimer</button>}
           </li>
         ))}
         {evts.length === 0 && <li class="vide">Aucune saisie.</li>}
@@ -156,6 +161,7 @@ function PeseeForm({ animalId, onFini }: { animalId: string; onFini: (m: string)
 
 // Soin d'un animal ou d'un lot ; le coût crée aussi une dépense (activité et trésorerie)
 export function SoinForm({ animalId, lotId, espece, onFini }: { animalId: string; lotId: string; espece: Espece; onFini: (m: string) => void }) {
+  const argent = peut(useRole(), 'argent');
   const [type, setType] = useState<Soin['type']>('vaccin');
   const [produit, setProduit] = useState('');
   const [date, setDate] = useState(today());
@@ -168,7 +174,7 @@ export function SoinForm({ animalId, lotId, espece, onFini }: { animalId: string
   async function envoyer(e: Event) {
     e.preventDefault();
     if (!produit.trim()) return;
-    const c = Math.max(0, nombre(cout));
+    const c = argent ? Math.max(0, nombre(cout)) : 0;
     const soinId = newId();
     await saveRecord('soin', soinId, { animalId, lotId, date, type, produit: produit.trim(), veterinaire: veto.trim(), cout: c, delaiAttente: Math.max(0, Math.floor(nombre(delai))), rappel, note: note.trim() } satisfies Soin);
     if (c > 0) {
@@ -185,8 +191,8 @@ export function SoinForm({ animalId, lotId, espece, onFini }: { animalId: string
       <Champ label="Délai d'attente avant vente ou abattage" type="number" min={0} value={delai} onChange={setDelai} suffixe="jours" placeholder="0" />
       <Champ label="Prochain rappel (facultatif)" type="date" value={rappel} onChange={setRappel} />
       <Champ label="Vétérinaire (facultatif)" value={veto} onChange={setVeto} />
-      <Champ label="Coût (facultatif)" type="number" min={0} value={cout} onChange={setCout} suffixe="FCFA" />
-      {nombre(cout) > 0 && <Choix label="Payé avec" value={compte} onChange={setCompte} options={COMPTES} />}
+      {argent && <Champ label="Coût (facultatif)" type="number" min={0} value={cout} onChange={setCout} suffixe="FCFA" />}
+      {argent && nombre(cout) > 0 && <Choix label="Payé avec" value={compte} onChange={setCompte} options={COMPTES} />}
       <Champ label="Note (facultatif)" value={note} onChange={setNote} />
       <Boutons onAnnuler={() => onFini('')} />
     </form>
@@ -199,11 +205,11 @@ function ReproForm({ femelle, onFini }: { femelle: Item<Animal>; onFini: (m: str
   const [date, setDate] = useState(today());
   const [maleId, setMaleId] = useState('');
   const [resultat, setResultat] = useState<'gestante' | 'vide'>('gestante');
-  const [gest, setGest] = useState(String(GESTATION_JOURS[femelle.espece]));
+  const [gest, setGest] = useState(String(gestationParDefaut(femelle.espece)));
   const males = r.animaux.filter((x) => x.espece === femelle.espece && x.sexe === 'M' && r.statut(x.id) === 'present');
   async function envoyer(e: Event) {
     e.preventDefault();
-    await saveRecord('repro', newId(), { femelleId: femelle.id, type, date, maleId: type === 'saillie' ? maleId : '', resultat: type === 'diagnostic' ? resultat : '', gestationJours: Math.round(nombre(gest)) || GESTATION_JOURS[femelle.espece], note: '' } satisfies Repro);
+    await saveRecord('repro', newId(), { femelleId: femelle.id, type, date, maleId: type === 'saillie' ? maleId : '', resultat: type === 'diagnostic' ? resultat : '', gestationJours: Math.round(nombre(gest)) || gestationParDefaut(femelle.espece), note: '' } satisfies Repro);
     onFini(type === 'saillie' ? 'Saillie enregistrée : la mise bas prévue est dans le calendrier' : 'Enregistré');
   }
   return (

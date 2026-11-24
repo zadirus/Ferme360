@@ -76,3 +76,19 @@ export async function listAll(): Promise<Rec[]> {
   const all = await wrap<Rec[]>((await store('records', 'readonly')).getAll());
   return all.filter((r) => !r.deleted);
 }
+
+// Efface tout sur ce téléphone (changement de personne qui se connecte)
+export async function viderBase(): Promise<void> {
+  await wrap((await store('records', 'readwrite')).clear());
+  await wrap((await store('meta', 'readwrite')).clear());
+}
+
+// Supprime les enregistrements qui ne satisfont plus le critère (profil réduit)
+export async function purgerSauf(garder: (r: Rec) => boolean): Promise<void> {
+  const tous = await wrap<Rec[]>((await store('records', 'readonly')).getAll());
+  for (const r of tous) if (!garder(r)) await wrap((await store('records', 'readwrite')).delete(r.id));
+}
+
+export async function exporterTout(): Promise<Rec[]> {
+  return listAll();
+}

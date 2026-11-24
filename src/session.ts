@@ -8,6 +8,10 @@ const USER = 'ferme360.user';
 
 export const getToken = () => localStorage.getItem(TOKEN);
 
+export function saveUser(user: User) {
+  localStorage.setItem(USER, JSON.stringify(user));
+}
+
 export function getUser(): User | null {
   try {
     return JSON.parse(localStorage.getItem(USER) ?? 'null');
@@ -24,6 +28,11 @@ export function saveSession(token: string, user: User) {
 // Le jeton est effacé, mais les saisies restent sur le téléphone.
 export function clearToken() {
   localStorage.removeItem(TOKEN);
+}
+
+export function deconnexion() {
+  clearToken();
+  localStorage.removeItem(USER);
 }
 
 export async function api<T>(path: string, body?: unknown): Promise<T> {

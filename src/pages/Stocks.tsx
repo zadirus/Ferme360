@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
-import { dataOf, go, useItems, type Item } from '../hooks';
+import { dataOf, go, useItems, useRole, type Item } from '../hooks';
+import { peut, peutEcrire } from '../droits';
 import { fmtDate, fmtDec, fmtFcfa, today } from '../format';
 import { alertesArticle, lotsRestants, stockArticle } from '../gestion/calculs';
 import { ACTIVITES, COMPTES, type Achat, type Activite, type Article, type Compte, type Fournisseur, type StockMvt } from '../gestion/types';
@@ -17,6 +18,7 @@ export function Stocks() {
   const mvts = useItems<StockMvt>('stock_mvt');
   const [mode, setMode] = useState<'article' | 'achat' | null>(null);
   const [message, setMessage] = useState('');
+  const role = useRole();
   const fini = (m: string) => { setMode(null); setMessage(m); };
   const mvtsDe = (id: string) => mvts.filter((m) => m.articleId === id);
   const alertes = articles.flatMap((a) => alertesArticle(a, mvtsDe(a.id), today()));
@@ -27,7 +29,7 @@ export function Stocks() {
       <p class="intro">Aliments et médicaments : entrées par les achats, sorties par l'alimentation des bandes ou à la main.</p>
       <Alertes liste={alertes} />
       {message && <p class="succes" role="status">{message}</p>}
-      {!mode && (
+      {!mode && peut(role, 'achats') && (
         <div class="actions">
           <button class="principal" type="button" onClick={() => setMode('achat')}><span class="e">🛒</span>Nouvel achat</button>
           <button class="principal" type="button" onClick={() => setMode('article')}><span class="e">📦</span>Nouvel article</button>

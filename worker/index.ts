@@ -1,5 +1,7 @@
 // API Ferme360 : connexion et synchronisation hors-ligne (Cloudflare Workers + D1)
 
+import { collectionsLisibles, peutEcrire, ROLES_CREABLES } from '../src/droits';
+
 interface Env {
   DB: D1Database;
   SETUP_CODE?: string;
@@ -28,7 +30,8 @@ const SCHEMA = [
      role TEXT NOT NULL,
      salt TEXT NOT NULL,
      hash TEXT NOT NULL,
-     created_at INTEGER NOT NULL)`,
+     created_at INTEGER NOT NULL,
+     active INTEGER NOT NULL DEFAULT 1)`,
   `CREATE TABLE IF NOT EXISTS attempts (name TEXT PRIMARY KEY COLLATE NOCASE, fails INTEGER NOT NULL, locked_until INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS records (
      id TEXT PRIMARY KEY,
@@ -38,6 +41,15 @@ const SCHEMA = [
      updated_at INTEGER NOT NULL,
      deleted INTEGER NOT NULL DEFAULT 0,
      author TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS journal (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     record_id TEXT NOT NULL,
+     collection TEXT NOT NULL,
+     action TEXT NOT NULL,
+     author TEXT NOT NULL,
+     at INTEGER NOT NULL,
+     before TEXT NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS journal_at ON journal(at)`,
   `CREATE INDEX IF NOT EXISTS records_seq ON records(seq)`,
   `CREATE INDEX IF NOT EXISTS records_collection ON records(collection)`
 ];
@@ -48,6 +60,11 @@ function ensureSchema(db: D1Database): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
       await db.batch(SCHEMA.map((s) => db.prepare(s)));
+      // bases créées avant l'étape 6 : ajout de la colonne « actif »
+      const cols = await db.prepare(`PRAGMA table_info(users)`).all<{ name: string }>();
+      if (!cols.results.some((c) => c.name === 'active')) {
+        await db.prepare(`ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1`).run();
+      }
       await db
         .prepare(`INSERT OR IGNORE INTO settings(key, value) VALUES ('token_secret', ?)`)
         .bind(randomHex(32))
@@ -138,6 +155,7 @@ async function makeToken(db: D1Database, s: Omit<Session, 'exp'>): Promise<strin
   return `${body}.${b64url(sig)}`;
 }
 
+// Le rôle et l'état du compte sont relus en base à chaque requête : un compte désactivé ou changé de profil est pris en compte tout de suite.
 async function readSession(req: Request, db: D1Database): Promise<Session | null> {
   const auth = req.headers.get('authorization') ?? '';
   if (!auth.startsWith('Bearer ')) return null;
@@ -147,7 +165,10 @@ async function readSession(req: Request, db: D1Database): Promise<Session | null
     const ok = await crypto.subtle.verify('HMAC', await secretKey(db), b64urlDecode(sig), enc.encode(body));
     if (!ok) return null;
     const s = JSON.parse(new TextDecoder().decode(b64urlDecode(body))) as Session;
-    return s.exp > Date.now() ? s : null;
+    if (s.exp <= Date.now()) return null;
+    const u = await db.prepare(`SELECT id,name,role,active FROM users WHERE id=?`).bind(s.uid).first<{ id: string; name: string; role: string; active: number }>();
+    if (!u || u.active !== 1) return null;
+    return { uid: u.id, name: u.name, role: u.role, exp: s.exp };
   } catch {
     return null;
   }
@@ -210,9 +231,9 @@ async function login(req: Request, env: Env): Promise<Response> {
     .bind(name)
     .first<{ fails: number; locked_until: number }>();
   if (att && att.locked_until > now) return fail(429, 'Trop d’essais. Réessayez dans quelques minutes.');
-  const u = await env.DB.prepare(`SELECT id,name,role,salt,hash FROM users WHERE name=?`)
+  const u = await env.DB.prepare(`SELECT id,name,role,salt,hash,active FROM users WHERE name=?`)
     .bind(name)
-    .first<{ id: string; name: string; role: string; salt: string; hash: string }>();
+    .first<{ id: string; name: string; role: string; salt: string; hash: string; active: number }>();
   const hash = await hashPassword(password, u?.salt ?? '00'.repeat(16));
   if (!u || !safeEqual(hash, u.hash)) {
     const fails = (att?.fails ?? 0) + 1;
@@ -224,7 +245,10 @@ async function login(req: Request, env: Env): Promise<Response> {
       .run();
     return fail(401, 'Nom ou mot de passe incorrect.');
   }
+  if (u.active !== 1) return fail(403, 'Ce compte est désactivé. Voyez le propriétaire.');
   await env.DB.prepare(`DELETE FROM attempts WHERE name=?`).bind(name).run();
+  // le journal est conservé 24 mois
+  await env.DB.prepare(`DELETE FROM journal WHERE at < ?`).bind(Date.now() - 730 * 86_400_000).run();
   const token = await makeToken(env.DB, { uid: u.id, name: u.name, role: u.role });
   return json({ token, user: { name: u.name, role: u.role } });
 }
@@ -253,29 +277,63 @@ async function sync(req: Request, env: Env, session: Session): Promise<Response>
   const changes = Array.isArray(b.changes) ? b.changes : [];
   if (changes.length > MAX_CHANGES) return fail(413, 'Trop de modifications à la fois.');
 
-  const stmts: D1PreparedStatement[] = [];
+  const valides: SyncRecord[] = [];
+  const rejected: string[] = [];
   for (const c of changes) {
     if (!validRecord(c)) return fail(400, 'Enregistrement invalide.');
-    const data = JSON.stringify(c.data);
-    if (data.length > MAX_DATA_BYTES) return fail(413, 'Enregistrement trop volumineux.');
-    // la dernière modification gagne (horloge corrigée côté téléphone)
-    stmts.push(
-      env.DB.prepare(
-        `INSERT INTO records(id,seq,collection,data,updated_at,deleted,author)
-         VALUES (?, ${NEXT_SEQ}, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-           seq=${NEXT_SEQ}, collection=excluded.collection, data=excluded.data,
-           updated_at=excluded.updated_at, deleted=excluded.deleted, author=excluded.author
-         WHERE excluded.updated_at >= records.updated_at`
-      ).bind(c.id, c.collection, data, c.updatedAt, c.deleted ? 1 : 0, session.name)
-    );
+    // droits du profil : ce qui n'est pas permis est refusé côté serveur
+    if (!peutEcrire(session.role, c.collection)) rejected.push(c.id);
+    else valides.push(c);
   }
-  if (stmts.length) await env.DB.batch(stmts);
 
+  if (valides.length) {
+    // valeurs actuelles, pour le journal des modifications (100 paramètres maximum par requête D1)
+    const avant = new Map<string, { data: string; updated_at: number; deleted: number }>();
+    const lots: SyncRecord[][] = [];
+    for (let i = 0; i < valides.length; i += 90) lots.push(valides.slice(i, i + 90));
+    const lus = await env.DB.batch(
+      lots.map((l) =>
+        env.DB.prepare(`SELECT id,data,updated_at,deleted FROM records WHERE id IN (${l.map(() => '?').join(',')})`).bind(...l.map((x) => x.id))
+      )
+    );
+    for (const r of lus) for (const x of r.results as Array<{ id: string; data: string; updated_at: number; deleted: number }>) avant.set(x.id, x);
+
+    const stmts: D1PreparedStatement[] = [];
+    const maintenant = Date.now();
+    for (const c of valides) {
+      const data = JSON.stringify(c.data);
+      if (data.length > MAX_DATA_BYTES) return fail(413, 'Enregistrement trop volumineux.');
+      const ancien = avant.get(c.id);
+      if (ancien && c.updatedAt >= ancien.updated_at && (ancien.data !== data || (ancien.deleted === 1) !== c.deleted)) {
+        const action = c.deleted && ancien.deleted !== 1 ? 'suppression' : 'modification';
+        stmts.push(
+          env.DB.prepare(`INSERT INTO journal(record_id,collection,action,author,at,before) VALUES (?,?,?,?,?,?)`).bind(
+            c.id, c.collection, action, session.name, maintenant, ancien.data.slice(0, 4000)
+          )
+        );
+      }
+      // la dernière modification gagne (horloge corrigée côté téléphone)
+      stmts.push(
+        env.DB.prepare(
+          `INSERT INTO records(id,seq,collection,data,updated_at,deleted,author)
+           VALUES (?, ${NEXT_SEQ}, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             seq=${NEXT_SEQ}, collection=excluded.collection, data=excluded.data,
+             updated_at=excluded.updated_at, deleted=excluded.deleted, author=excluded.author
+           WHERE excluded.updated_at >= records.updated_at`
+        ).bind(c.id, c.collection, data, c.updatedAt, c.deleted ? 1 : 0, session.name)
+      );
+    }
+    await env.DB.batch(stmts);
+  }
+
+  // lecture : seulement les collections permises au profil
+  const lisibles = collectionsLisibles(session.role);
+  const filtre = lisibles === null ? '' : ` AND collection IN (${lisibles.map(() => '?').join(',')})`;
   const rows = await env.DB.prepare(
-    `SELECT id,seq,collection,data,updated_at,deleted,author FROM records WHERE seq > ? ORDER BY seq LIMIT ?`
+    `SELECT id,seq,collection,data,updated_at,deleted,author FROM records WHERE seq > ?${filtre} ORDER BY seq LIMIT ?`
   )
-    .bind(since, PAGE_SIZE + 1)
+    .bind(since, ...(lisibles ?? []), PAGE_SIZE + 1)
     .all<{ id: string; seq: number; collection: string; data: string; updated_at: number; deleted: number; author: string }>();
   const page = rows.results.slice(0, PAGE_SIZE);
   const more = rows.results.length > PAGE_SIZE;
@@ -283,6 +341,8 @@ async function sync(req: Request, env: Env, session: Session): Promise<Response>
     serverTime: Date.now(),
     seq: page.length ? page[page.length - 1].seq : since,
     more,
+    rejected,
+    user: { name: session.name, role: session.role },
     records: page.map((r) => ({
       id: r.id,
       collection: r.collection,
@@ -291,6 +351,80 @@ async function sync(req: Request, env: Env, session: Session): Promise<Response>
       deleted: r.deleted === 1,
       author: r.author
     }))
+  });
+}
+
+// ---------- comptes (propriétaire seulement) ----------
+
+async function listeComptes(env: Env): Promise<Response> {
+  const r = await env.DB.prepare(`SELECT id,name,role,active,created_at FROM users ORDER BY created_at`).all<{ id: string; name: string; role: string; active: number; created_at: number }>();
+  return json({ users: r.results.map((u) => ({ id: u.id, name: u.name, role: u.role, active: u.active === 1, createdAt: u.created_at })) });
+}
+
+async function creerCompte(req: Request, env: Env): Promise<Response> {
+  const b = await readBody(req);
+  const name = String(b?.name ?? '').trim();
+  const password = String(b?.password ?? '');
+  const role = String(b?.role ?? '');
+  if (name.length < 2 || name.length > 60) return fail(400, 'Le nom doit avoir entre 2 et 60 caractères.');
+  if (password.length < 8) return fail(400, 'Le mot de passe doit avoir au moins 8 caractères.');
+  if (!ROLES_CREABLES.some(([r]) => r === role)) return fail(400, 'Profil inconnu.');
+  const salt = randomHex(16);
+  const hash = await hashPassword(password, salt);
+  try {
+    await env.DB.prepare(`INSERT INTO users(id,name,role,salt,hash,created_at,active) VALUES (?,?,?,?,?,?,1)`)
+      .bind(crypto.randomUUID(), name, role, salt, hash, Date.now())
+      .run();
+  } catch {
+    return fail(409, 'Ce nom est déjà utilisé.');
+  }
+  return json({ ok: true });
+}
+
+async function modifierCompte(req: Request, env: Env, session: Session): Promise<Response> {
+  const b = await readBody(req);
+  const id = String(b?.id ?? '');
+  const u = await env.DB.prepare(`SELECT id,role FROM users WHERE id=?`).bind(id).first<{ id: string; role: string }>();
+  if (!u) return fail(404, 'Compte introuvable.');
+  if (u.id === session.uid || u.role === 'owner') {
+    if (b?.active === false || (b?.role !== undefined && b.role !== u.role)) return fail(400, 'Le compte du propriétaire ne peut être ni désactivé ni changé de profil.');
+  }
+  if (typeof b?.role === 'string' && b.role !== u.role) {
+    if (!ROLES_CREABLES.some(([r]) => r === b.role)) return fail(400, 'Profil inconnu.');
+    await env.DB.prepare(`UPDATE users SET role=? WHERE id=?`).bind(b.role, id).run();
+  }
+  if (typeof b?.active === 'boolean') await env.DB.prepare(`UPDATE users SET active=? WHERE id=?`).bind(b.active ? 1 : 0, id).run();
+  if (typeof b?.password === 'string' && b.password !== '') {
+    if (b.password.length < 8) return fail(400, 'Le mot de passe doit avoir au moins 8 caractères.');
+    const salt = randomHex(16);
+    await env.DB.prepare(`UPDATE users SET salt=?, hash=? WHERE id=?`).bind(salt, await hashPassword(b.password, salt), id).run();
+  }
+  return json({ ok: true });
+}
+
+async function changerMotDePasse(req: Request, env: Env, session: Session): Promise<Response> {
+  const b = await readBody(req);
+  const ancien = String(b?.ancien ?? '');
+  const nouveau = String(b?.nouveau ?? '');
+  if (nouveau.length < 8) return fail(400, 'Le nouveau mot de passe doit avoir au moins 8 caractères.');
+  const u = await env.DB.prepare(`SELECT salt,hash FROM users WHERE id=?`).bind(session.uid).first<{ salt: string; hash: string }>();
+  if (!u || !safeEqual(await hashPassword(ancien, u.salt), u.hash)) return fail(401, 'Mot de passe actuel incorrect.');
+  const salt = randomHex(16);
+  await env.DB.prepare(`UPDATE users SET salt=?, hash=? WHERE id=?`).bind(salt, await hashPassword(nouveau, salt), session.uid).run();
+  return json({ ok: true });
+}
+
+async function journal(url: URL, env: Env): Promise<Response> {
+  const limite = Math.min(200, Math.max(1, Number(url.searchParams.get('limite')) || 100));
+  const r = await env.DB.prepare(`SELECT id,record_id,collection,action,author,at,before FROM journal ORDER BY id DESC LIMIT ?`)
+    .bind(limite)
+    .all<{ id: number; record_id: string; collection: string; action: string; author: string; at: number; before: string }>();
+  return json({
+    entrees: r.results.map((e) => {
+      let avant: unknown = null;
+      try { avant = JSON.parse(e.before); } catch { avant = null; }
+      return { id: e.id, recordId: e.record_id, collection: e.collection, action: e.action, author: e.author, at: e.at, avant };
+    })
   });
 }
 
@@ -311,6 +445,14 @@ export default {
       if (!session) return fail(401, 'Connexion requise.');
       if (route === 'GET /api/me') return json({ user: { name: session.name, role: session.role } });
       if (route === 'POST /api/sync') return await sync(req, env, session);
+      if (route === 'POST /api/password') return await changerMotDePasse(req, env, session);
+      if (url.pathname === '/api/users' || url.pathname === '/api/users/update' || url.pathname === '/api/journal') {
+        if (session.role !== 'owner') return fail(403, 'Réservé au propriétaire.');
+        if (route === 'GET /api/users') return await listeComptes(env);
+        if (route === 'POST /api/users') return await creerCompte(req, env);
+        if (route === 'POST /api/users/update') return await modifierCompte(req, env, session);
+        if (route === 'GET /api/journal') return await journal(url, env);
+      }
       return fail(404, 'Introuvable.');
     } catch (e) {
       console.error(e);

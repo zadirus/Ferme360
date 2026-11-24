@@ -1,7 +1,8 @@
 import { useState } from 'preact/hooks';
-import { dataOf, useItems } from '../hooks';
+import { dataOf, useItems, useRole } from '../hooks';
+import { peut, peutEcrire } from '../droits';
 import { fmtDate, fmtDec, fmtFcfa, fmtInt, joursEntre, today } from '../format';
-import { coutMoyen } from '../gestion/calculs';
+import { coutDistribution, coutMoyen } from '../gestion/calculs';
 import type { Achat, Article, StockMvt, Vente } from '../gestion/types';
 import { dernierPoids, indicateursLot } from '../ruminants/calculs';
 import { libelleAnimal, useRuminants } from '../ruminants/donnees';
@@ -16,6 +17,10 @@ export function LotDetail({ id }: { id: string }) {
   const r = useRuminants();
   const ventes = useItems<Vente>('vente');
   const stockMvts = useItems<StockMvt>('stock_mvt');
+  const articlesTous = useItems<Article>('article');
+  const role = useRole();
+  const argent = peut(role, 'argent');
+  const ecrit = (c: string) => peutEcrire(role, c);
   const [action, setAction] = useState<Action | null>(null);
   const [message, setMessage] = useState('');
   const lot = r.lots.find((l) => l.id === id);
@@ -24,7 +29,7 @@ export function LotDetail({ id }: { id: string }) {
   const retour = lot.espece === 'ovin' ? '/moutons' : '/boeufs';
   const passes = r.animaux.filter((a) => r.etat(a.id).lotId === id);
   const presents = passes.filter((a) => r.statut(a.id) === 'present');
-  const ind = indicateursLot(id, passes, new Set(presents.map((a) => a.id)), r.pesees, r.rations, r.soins);
+  const ind = indicateursLot(id, passes, new Set(presents.map((a) => a.id)), r.pesees, r.rations.map((x) => ({ ...x, cout: coutDistribution(x, articlesTous, r.achats) })), r.soins);
   const idsLot = new Set(passes.map((a) => a.id));
   const ventesLot = ventes.flatMap((v) => v.lignes).filter((l) => l.animalId && idsLot.has(l.animalId)).reduce((s, l) => s + l.quantite * l.prixUnitaire, 0);
   const nVendus = passes.filter((a) => r.statut(a.id) === 'vendu').length;
@@ -64,18 +69,18 @@ export function LotDetail({ id }: { id: string }) {
         <Stat valeur={ind.poidsMoyen !== null ? `${fmtDec(ind.poidsMoyen, 1)} kg` : '—'} label="Poids moyen" />
         <Stat valeur={ind.gmq !== null ? `${fmtDec(ind.gmq, 0)} g/j` : '—'} label="GMQ moyen" />
         <Stat valeur={`${fmtDec(ind.gain, 0)} kg`} label="Poids gagné (total)" />
-        {ind.couts.total > 0 && <Stat valeur={fmtFcfa(ind.couts.total)} label={`Coûts : achat ${fmtFcfa(ind.couts.achat)}, aliment ${fmtFcfa(ind.couts.aliment)}, soins ${fmtFcfa(ind.couts.soins)}`} />}
-        {ind.coutKgVif !== null && <Stat valeur={fmtFcfa(ind.coutKgVif)} label="Coût de revient du kg vif" />}
-        {ind.coutKgGagne !== null && <Stat valeur={fmtFcfa(ind.coutKgGagne)} label="Coût du kg gagné (aliment + soins)" />}
-        {nVendus > 0 && <Stat valeur={fmtFcfa(ventesLot - ind.couts.total)} label={`Résultat : ${nVendus} vendu(s) ${fmtFcfa(ventesLot)} − coûts`} />}
+        {argent && ind.couts.total > 0 && <Stat valeur={fmtFcfa(ind.couts.total)} label={`Coûts : achat ${fmtFcfa(ind.couts.achat)}, aliment ${fmtFcfa(ind.couts.aliment)}, soins ${fmtFcfa(ind.couts.soins)}`} />}
+        {argent && ind.coutKgVif !== null && <Stat valeur={fmtFcfa(ind.coutKgVif)} label="Coût de revient du kg vif" />}
+        {argent && ind.coutKgGagne !== null && <Stat valeur={fmtFcfa(ind.coutKgGagne)} label="Coût du kg gagné (aliment + soins)" />}
+        {argent && nVendus > 0 && <Stat valeur={fmtFcfa(ventesLot - ind.couts.total)} label={`Résultat : ${nVendus} vendu(s) ${fmtFcfa(ventesLot)} − coûts`} />}
       </div>
       {message && <p class="succes" role="status">{message}</p>}
       {!action && (
         <div class="actions">
-          <button class="principal" type="button" onClick={() => setAction('pesees')}><span class="e">⚖️</span>Pesée du lot</button>
-          <button class="principal" type="button" onClick={() => setAction('ration')}><span class="e">🌽</span>Ration</button>
-          <button class="principal" type="button" onClick={() => setAction('soin')}><span class="e">💉</span>Soin du lot</button>
-          <button class="principal" type="button" onClick={() => setAction('ajout')}><span class="e">➕</span>Ajouter des animaux</button>
+          {ecrit('pesee') && <button class="principal" type="button" onClick={() => setAction('pesees')}><span class="e">⚖️</span>Pesée du lot</button>}
+          {ecrit('ration') && <button class="principal" type="button" onClick={() => setAction('ration')}><span class="e">🌽</span>Ration</button>}
+          {ecrit('soin') && <button class="principal" type="button" onClick={() => setAction('soin')}><span class="e">💉</span>Soin du lot</button>}
+          {ecrit('mvt_animal') && <button class="principal" type="button" onClick={() => setAction('ajout')}><span class="e">➕</span>Ajouter des animaux</button>}
         </div>
       )}
       {action === 'pesees' && <PeseesLot animaux={presents} onFini={fini} />}
@@ -94,10 +99,10 @@ export function LotDetail({ id }: { id: string }) {
 
       {(r.rations.some((x) => x.lotId === id) || r.soins.some((s) => s.lotId === id)) && <h3>Rations et soins du lot</h3>}
       <ul>
-        {[...r.rations.filter((x) => x.lotId === id).map((x) => ({ cle: 'r' + x.id, date: x.date, texte: `Ration : ${fmtDec(x.kg, 0)} kg${x.cout ? ` · ${fmtFcfa(x.cout)}` : ''}`, sup: () => supprRation(x) })),
-          ...r.soins.filter((s) => s.lotId === id).map((s) => ({ cle: 's' + s.id, date: s.date, texte: `${NOM_SOIN[s.type]} : ${s.produit}${s.delaiAttente ? ` · délai ${s.delaiAttente} j` : ''}`, sup: () => supprSoin(s) }))]
+        {[...r.rations.filter((x) => x.lotId === id).map((x) => ({ cle: 'r' + x.id, date: x.date, texte: `Ration : ${fmtDec(x.kg, 0)} kg${argent && coutDistribution(x, articlesTous, r.achats) ? ` · ${fmtFcfa(coutDistribution(x, articlesTous, r.achats))}` : ''}`, col: 'ration', sup: () => supprRation(x) })),
+          ...r.soins.filter((s) => s.lotId === id).map((s) => ({ cle: 's' + s.id, date: s.date, texte: `${NOM_SOIN[s.type]} : ${s.produit}${s.delaiAttente ? ` · délai ${s.delaiAttente} j` : ''}`, col: 'soin', sup: () => supprSoin(s) }))]
           .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30).map((e) => (
-            <li key={e.cle}><div class="ligne"><span>{e.texte}</span><small>{fmtDate(e.date)}</small></div><button type="button" class="lien" onClick={() => void e.sup()}>Supprimer</button></li>
+            <li key={e.cle}><div class="ligne"><span>{e.texte}</span><small>{fmtDate(e.date)}</small></div>{ecrit(e.col) && <button type="button" class="lien" onClick={() => void e.sup()}>Supprimer</button>}</li>
           ))}
       </ul>
     </section>

@@ -1,6 +1,8 @@
-import { useItems } from '../hooks';
+import { useItems, useRole } from '../hooks';
+import { peut } from '../droits';
 import { fmtDate, fmtFcfa, fmtInt, fmtPlateaux, joursEntre, today } from '../format';
-import { alertesArticle, creances, JOURS_ALERTE_CREANCE, soldesComptes } from '../gestion/calculs';
+import { alertesArticle, creances, soldesComptes } from '../gestion/calculs';
+import { REGLAGES } from '../reglages';
 import type { Achat, Article, Client, Depense, Paiement, Reglement, StockMvt, TresoMvt, Vente } from '../gestion/types';
 import { alertes, effectifActuel, stockOeufs } from '../poules/calculs';
 import type { Bande, Mortalite, MvtOeufs, Ramassage, Sante } from '../poules/types';
@@ -11,6 +13,9 @@ import { NOM_SOIN } from '../ruminants/types';
 import { Alertes } from '../ui';
 
 export function Accueil() {
+  const role = useRole();
+  const argent = peut(role, 'argent');
+  const avecStocks = peut(role, 'stocks');
   const bandes = useItems<Bande>('bande').filter((b) => !b.cloturee);
   const ram = useItems<Ramassage>('ramassage');
   const morts = useItems<Mortalite>('mortalite');
@@ -49,8 +54,8 @@ export function Accueil() {
       alertes(b, ram.filter((r) => r.bandeId === b.id), morts.filter((m) => m.bandeId === b.id)).map((a) => `${b.nom} : ${a}`)
     ),
     ...alertesStock,
-    ...cr
-      .filter((c) => c.jours > JOURS_ALERTE_CREANCE)
+    ...(argent ? cr : [])
+      .filter((c) => c.jours > REGLAGES.joursCreance)
       .map((c) => `${clients.find((x) => x.id === c.clientId)?.nom ?? 'Client'} doit ${fmtFcfa(c.solde)} depuis ${c.jours} jours`)
   ];
 
@@ -83,28 +88,28 @@ export function Accueil() {
             <span class="petit">plateaux en stock</span>
           </a>
         </li>
-        <li>
+        {argent && <li>
           <a class="tuile t-argent" href="#/ventes">
             <span class="ico">🧾</span>
             <span class="gros">{fmtFcfa(aEncaisser)}</span>
             <span class="petit">à encaisser</span>
           </a>
-        </li>
-        <li>
+        </li>}
+        {argent && <li>
           <a class="tuile t-argent" href="#/argent">
             <span class="ico">💰</span>
             <span class="gros">{fmtFcfa(tresorerie)}</span>
             <span class="petit">en caisse et comptes</span>
           </a>
-        </li>
-        <li>
+        </li>}
+        {avecStocks && <li>
           <a class="tuile t-stock" href="#/stocks">
             <span class="ico">📦</span>
             <span class="gros">{articles.length}</span>
             <span class="petit">article(s) en stock</span>
             {alertesStock.length > 0 && <span class="pt">{alertesStock.length}</span>}
           </a>
-        </li>
+        </li>}
         <li>
           <a class="tuile" href="#/carnet">
             <span class="ico">📒</span>

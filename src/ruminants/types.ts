@@ -5,7 +5,6 @@ export const NOM_ESPECE: Record<Espece, string> = { ovin: 'Mouton', bovin: 'Bœu
 export const NOM_ESPECES: Record<Espece, string> = { ovin: 'Moutons', bovin: 'Bœufs' };
 export const ICONE_ESPECE: Record<Espece, string> = { ovin: '🐑', bovin: '🐄' };
 export const ACTIVITE_ESPECE: Record<Espece, Activite> = { ovin: 'ovins', bovin: 'bovins' };
-export const GESTATION_JOURS: Record<Espece, number> = { ovin: 150, bovin: 283 };
 export const RACES: Record<Espece, string[]> = {
   ovin: ['Djallonké', 'Peul', 'Touabire', 'Bali-bali', 'Croisé'],
   bovin: ['Baoulé', 'N’Dama', 'Zébu', 'Gudali', 'Croisé']

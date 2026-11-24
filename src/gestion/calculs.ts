@@ -1,8 +1,7 @@
 import { joursEntre, OEUFS_PAR_PLATEAU } from '../format';
+import { REGLAGES } from '../reglages';
 import type { Achat, Article, Client, Compte, Depense, LigneVente, Paiement, Reglement, StockMvt, TresoMvt, Vente, Activite } from './types';
 
-export const JOURS_ALERTE_PEREMPTION = 30;
-export const JOURS_ALERTE_CREANCE = 30;
 
 export function compteDuMode(mode: Paiement['mode']): Compte {
   return mode === 'especes' ? 'caisse' : mode === 'mobile_money' ? 'mobile_money' : 'banque';
@@ -83,7 +82,7 @@ export function alertesArticle(a: Article, mvts: StockMvt[], aujourdhui: string)
     if (!l.peremption) continue;
     const j = joursEntre(aujourdhui, l.peremption);
     if (j < 0) out.push(`${a.nom} : lot périmé depuis ${-j} jour(s)`);
-    else if (j <= JOURS_ALERTE_PEREMPTION) out.push(`${a.nom} : périme dans ${j} jour(s)`);
+    else if (j <= REGLAGES.joursPeremption) out.push(`${a.nom} : périme dans ${j} jour(s)`);
   }
   return out;
 }
@@ -138,3 +137,13 @@ export function resultats(ventes: Vente[], achats: Achat[], depenses: Depense[],
 }
 
 export const clientDe = (id: string, clients: Array<Client & { id: string }>) => clients.find((c) => c.id === id)?.nom ?? 'Sans nom (comptant)';
+
+// Coût d'une distribution d'aliment : calculé avec le coût moyen d'achat actuel (les profils sans accès à l'argent n'enregistrent pas de coût)
+export function coutDistribution(rec: { kg: number; articleId?: string; cout?: number }, articles: Array<Article & { id: string }>, achats: Achat[]): number {
+  if (rec.articleId) {
+    const a = articles.find((x) => x.id === rec.articleId);
+    const cm = a ? coutMoyen(a.id, achats) : 0;
+    if (a && cm > 0) return (rec.kg / a.kgParUnite) * cm;
+  }
+  return rec.cout ?? 0;
+}

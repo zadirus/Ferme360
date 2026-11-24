@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
-import { useItems } from '../hooks';
+import { useItems, useRole } from '../hooks';
+import { peutEcrire } from '../droits';
 import { fmtDate, fmtInt, fmtPct, today } from '../format';
 import { alertes, indicateurs } from '../poules/calculs';
 import type { Aliment, Bande, Mortalite, Ramassage } from '../poules/types';
@@ -12,6 +13,7 @@ export function Poules() {
   const morts = useItems<Mortalite>('mortalite');
   const aliments = useItems<Aliment>('aliment');
   const [creation, setCreation] = useState(false);
+  const role = useRole();
 
   const actives = bandes.filter((b) => !b.cloturee);
   const cloturees = bandes.filter((b) => b.cloturee);
@@ -43,7 +45,7 @@ export function Poules() {
     <section>
       <Retour vers="/elevage" texte="Élevage" />
       <h2>Poules pondeuses</h2>
-      {!creation && (
+      {!creation && peutEcrire(role, 'bande') && (
         <button class="principal" type="button" onClick={() => setCreation(true)}>
           + Nouvelle bande
         </button>

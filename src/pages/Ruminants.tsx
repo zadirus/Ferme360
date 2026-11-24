@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
-import { go } from '../hooks';
+import { go, useRole } from '../hooks';
+import { peut, peutEcrire } from '../droits';
 import { ageEnMois, fmtDate, fmtDec, fmtInt, fmtPct, joursEntre, today } from '../format';
 import { COMPTES, type Achat, type Compte } from '../gestion/types';
 import { dernierPoids, fertilite, miseBasPrevue, prolificite } from '../ruminants/calculs';
@@ -21,6 +22,7 @@ export function Ruminants({ espece }: { espece: Espece }) {
   const [recherche, setRecherche] = useState('');
   const [sortis, setSortis] = useState(false);
   const [message, setMessage] = useState('');
+  const role = useRole();
 
   const tous = r.animaux.filter((a) => a.espece === espece);
   const presents = tous.filter((a) => r.statut(a.id) === 'present');
@@ -54,8 +56,8 @@ export function Ruminants({ espece }: { espece: Espece }) {
       {message && <p class="succes" role="status">{message}</p>}
       {!mode && (
         <div class="actions">
-          <button class="principal" type="button" onClick={() => setMode('animal')}><span class="e">➕</span>Nouvel animal</button>
-          <button class="principal" type="button" onClick={() => setMode('lot')}><span class="e">🧺</span>Nouveau lot</button>
+          {peutEcrire(role, 'animal') && <button class="principal" type="button" onClick={() => setMode('animal')}><span class="e">➕</span>Nouvel animal</button>}
+          {peutEcrire(role, 'lot') && <button class="principal" type="button" onClick={() => setMode('lot')}><span class="e">🧺</span>Nouveau lot</button>}
         </div>
       )}
       {mode === 'animal' && <AnimalForm espece={espece} onFini={fini} />}
@@ -118,6 +120,7 @@ export function Ruminants({ espece }: { espece: Espece }) {
 
 function AnimalForm({ espece, onFini }: { espece: Espece; onFini: (m: string) => void }) {
   const r = useRuminants();
+  const argent = peut(useRole(), 'argent');
   const [boucle, setBoucle] = useState('');
   const [nom, setNom] = useState('');
   const [race, setRace] = useState(RACES[espece][0]);
@@ -180,7 +183,7 @@ function AnimalForm({ espece, onFini }: { espece: Espece; onFini: (m: string) =>
       <Champ label="Date de naissance" type="date" max={today()} value={naissance} onChange={setNaissance} />
       {!naissance && <Champ label="Ou âge estimé" type="number" min={0} value={ageMois} onChange={setAgeMois} suffixe="mois" />}
       <Champ label="Robe (couleur)" value={robe} onChange={setRobe} />
-      <Choix label="Origine" value={origine} onChange={setOrigine} options={[['ne', 'Né à la ferme'], ['achete', 'Acheté']]} />
+      <Choix label="Origine" value={origine} onChange={setOrigine} options={argent ? [['ne', 'Né à la ferme'], ['achete', 'Acheté']] : [['ne', 'Né à la ferme']]} />
       {origine === 'ne' ? (
         <>
           <Choix label="Mère" value={mereId} onChange={setMereId} options={[['', 'Inconnue'], ...presentsEspece.filter((a) => a.sexe === 'F').map((a) => [a.id, libelleAnimal(a)] as [string, string])]} />

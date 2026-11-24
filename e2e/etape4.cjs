@@ -34,7 +34,7 @@ const futur = (j) => { const d = new Date(); d.setDate(d.getDate() + j); return 
   ok(norm(await stat('Caisse (espèces)').innerText()).includes('400 000'), 'solde de départ de la caisse : 400 000 FCFA');
 
   // bande + ramassage
-  await tab('Poules');
+  await P.goto(BASE + '/#/poules'); await P.waitForTimeout(300);
   await P.getByRole('button', { name: '+ Nouvelle bande' }).click();
   await P.getByLabel('Nom de la bande').fill('Bande 1');
   await P.getByLabel("Nombre de poules à l'arrivée").fill('400');
@@ -78,7 +78,7 @@ const futur = (j) => { const d = new Date(); d.setDate(d.getDate() + j); return 
   ok(true, 'vaccin qui périme dans 25 jours : alerte affichée');
 
   // distribution d'aliment depuis le stock
-  await tab('Poules');
+  await P.goto(BASE + '/#/poules'); await P.waitForTimeout(300);
   await P.getByRole('link', { name: /Bande 1/ }).click();
   await P.getByRole('button', { name: /Aliment/ }).click();
   await P.getByLabel('Pris dans le stock').selectOption({ label: 'Aliment ponte' });
@@ -103,7 +103,7 @@ const futur = (j) => { const d = new Date(); d.setDate(d.getDate() + j); return 
   ok((await texte('.stat:has-text("Doit")')).includes('8 000'), 'vente 20 000 FCFA, payé 12 000 → créance 8 000 FCFA');
   await P.screenshot({ path: S + '/client.png', fullPage: true });
 
-  await tab('Poules');
+  await P.goto(BASE + '/#/poules'); await P.waitForTimeout(300);
   await P.getByRole('link', { name: /Bande 1/ }).click().catch(() => {});
   await P.goto(BASE + '/#/oeufs');
   await P.getByText('Œufs en stock').waitFor();

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { listAll, type Rec } from './db';
-import { onData } from './sync';
+import { getState, onData, subscribe } from './sync';
 
 export type Item<T> = T & { id: string; updatedAt: number; dirty: 0 | 1 };
 
@@ -68,6 +68,12 @@ export function useHash(): string {
     return () => window.removeEventListener('hashchange', f);
   }, []);
   return h;
+}
+
+export function useRole(): string {
+  const [r, setR] = useState(getState().role);
+  useEffect(() => subscribe(() => setR(getState().role)), []);
+  return r;
 }
 
 export const go = (path: string) => {

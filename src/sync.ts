@@ -1,6 +1,7 @@
 // Synchronisation : envoie les saisies en attente, récupère celles des autres téléphones.
-import { countDirty, dirtyRecords, getMeta, getRecord, putRecord, setMeta, type Rec } from './db';
-import { ApiError, api, clearToken, getToken, getUser } from './session';
+import { countDirty, dirtyRecords, getMeta, getRecord, purgerSauf, putRecord, setMeta, type Rec } from './db';
+import { peutEcrire, peutLire } from './droits';
+import { ApiError, api, clearToken, getToken, getUser, saveUser } from './session';
 
 export interface SyncState {
   syncing: boolean;
@@ -8,9 +9,10 @@ export interface SyncState {
   lastSync: number | null;
   error: string | null;
   needLogin: boolean;
+  role: string;
 }
 
-let state: SyncState = { syncing: false, pending: 0, lastSync: null, error: null, needLogin: false };
+let state: SyncState = { syncing: false, pending: 0, lastSync: null, error: null, needLogin: false, role: getUser()?.role ?? '' };
 const listeners = new Set<() => void>();
 
 function set(patch: Partial<SyncState>) {
@@ -39,6 +41,7 @@ export function newId(): string {
 }
 
 export async function saveRecord(collection: string, id: string, data: object, deleted = false) {
+  if (!peutEcrire(getUser()?.role ?? '', collection)) throw new Error("Votre profil n'a pas le droit d'enregistrer ceci.");
   const rec: Rec = {
     id,
     collection,
@@ -65,6 +68,8 @@ interface SyncResponse {
   seq: number;
   more: boolean;
   records: Array<Omit<Rec, 'dirty'>>;
+  rejected?: string[];
+  user?: { name: string; role: string };
 }
 
 export async function syncNow(): Promise<void> {
@@ -86,6 +91,20 @@ export async function syncNow(): Promise<void> {
         }))
       });
       await setMeta('clockOffset', res.serverTime - Date.now());
+      // le profil peut avoir été modifié par le propriétaire
+      if (res.user) {
+        saveUser(res.user);
+        if (res.user.role !== state.role) {
+          set({ role: res.user.role });
+          // profil réduit : on retire du téléphone ce qu'il n'a plus le droit de voir
+          await purgerSauf((r) => r.dirty === 1 || peutLire(res.user!.role, r.collection));
+        }
+      }
+      // saisies refusées par le serveur (droits) : on ne les renvoie plus
+      for (const id of res.rejected ?? []) {
+        const local = await getRecord(id);
+        if (local) await putRecord({ ...local, dirty: 0 });
+      }
       // une saisie modifiée pendant l'envoi reste « en attente »
       for (const p of pushed) {
         const local = await getRecord(p.id);
@@ -142,4 +161,8 @@ export function startAutoSync(): () => void {
 
 export function resetNeedLogin() {
   set({ needLogin: false });
+}
+
+export function setRole(role: string) {
+  set({ role });
 }
