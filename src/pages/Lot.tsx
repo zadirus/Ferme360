@@ -10,6 +10,7 @@ import { NOM_SOIN, type MvtAnimal, type Pesee, type Ration } from '../ruminants/
 import { newId, saveRecord } from '../sync';
 import { Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
 import { SoinForm } from './Animal';
+import { CroissanceLot, ParcLot } from './RuminantsExtras';
 
 type Action = 'pesees' | 'ration' | 'soin' | 'ajout';
 
@@ -87,6 +88,9 @@ export function LotDetail({ id }: { id: string }) {
       {action === 'ration' && <RationForm lotId={id} onFini={fini} />}
       {action === 'soin' && <SoinForm animalId="" lotId={id} espece={lot.espece} onFini={fini} />}
       {action === 'ajout' && <AjoutAnimaux lotId={id} espece={lot.espece} onFini={fini} />}
+
+      <ParcLot lot={lot} peutModifier={ecrit('pature')} />
+      <CroissanceLot animalIds={passes.map((a) => a.id)} pesees={r.pesees} />
 
       <h3>Animaux du lot</h3>
       <ul>

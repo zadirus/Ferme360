@@ -22,10 +22,10 @@ export interface Client {
 }
 
 export interface LigneVente {
-  article: 'oeufs' | 'fumier' | 'animal' | 'autre';
+  article: 'oeufs' | 'fumier' | 'animal' | 'lait' | 'autre';
   libelle: string;
   quantite: number; // animal : poids en kg (vente au poids) ou 1 (vente sur pied)
-  unite: 'plateau' | 'oeuf' | 'sac' | 'unite' | 'kg' | 'tete';
+  unite: 'plateau' | 'oeuf' | 'sac' | 'unite' | 'kg' | 'tete' | 'litre';
   prixUnitaire: number; // animal : prix au kg ou prix de la tête
   animalId?: string;
 }

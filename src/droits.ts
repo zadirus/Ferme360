@@ -21,16 +21,16 @@ const ECRITURE: Record<Role, string[] | '*'> = {
   gerant: '*',
   ouvrier: [
     'ramassage', 'mortalite', 'aliment', 'oeufs_mvt', 'stock_mvt', 'carnet', 'eau', 'fientes',
-    'animal', 'mvt_animal', 'pesee', 'repro', 'misebas', 'ration'
+    'animal', 'mvt_animal', 'pesee', 'repro', 'misebas', 'ration', 'photo', 'pature', 'traite', 'travail'
   ],
-  veterinaire: ['soin', 'sante', 'pesee', 'repro', 'carnet']
+  veterinaire: ['soin', 'sante', 'pesee', 'repro', 'carnet', 'photo']
 };
 
 // Ce qu'un profil peut LIRE en plus de ce qu'il enregistre. Jamais d'argent (ventes, achats, dépenses, clients…).
 const LECTURE_EN_PLUS: Record<Role, string[]> = {
   owner: [],
   gerant: [],
-  ouvrier: ['bande', 'lot', 'article', 'reglage', 'soin'],
+  ouvrier: ['bande', 'lot', 'article', 'reglage', 'soin', 'parc'],
   veterinaire: ['bande', 'mortalite', 'animal', 'mvt_animal', 'lot', 'misebas', 'reglage']
 };
 

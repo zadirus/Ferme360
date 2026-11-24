@@ -145,3 +145,9 @@ figure.courbe { margin: 10px 0; background: var(--carte); border-radius: 16px; p
 figure.courbe svg { width: 100%; height: auto; display: block; }
 figure.courbe figcaption { display: flex; gap: 14px; flex-wrap: wrap; font-size: .8rem; color: var(--gris); margin-top: 4px; }
 figure.courbe figcaption i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0; }
+.photos figure { margin: 0; background: var(--carte); border-radius: 12px; overflow: hidden; box-shadow: var(--ombre); }
+.photos figure img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+.photos figure.grande { grid-column: 1 / -1; }
+.photos figure.grande img { aspect-ratio: auto; max-height: 70vh; object-fit: contain; background: #000; }
+.photos figcaption { font-size: .75rem; color: var(--gris); padding: 4px 8px; display: flex; flex-direction: column; }

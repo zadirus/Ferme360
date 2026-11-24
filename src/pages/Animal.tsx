@@ -1,8 +1,9 @@
 import { useState } from 'preact/hooks';
-import { dataOf, go, useRole, type Item } from '../hooks';
+import { dataOf, go, useItems, useRole, type Item } from '../hooks';
 import { peut, peutEcrire } from '../droits';
 import { ageEnMois, fmtDate, fmtDec, fmtFcfa, joursEntre, today } from '../format';
-import { COMPTES, type Compte, type Depense } from '../gestion/types';
+import { COMPTES, type Compte, type Depense, type Paiement, type Vente } from '../gestion/types';
+import { CroissanceAnimal, fmtLitres, litresSur, PhotosAnimal, supprimerTravail, TraiteForm, TravailForm } from './RuminantsExtras';
 import { dernierPoids, finDelaiAttente, gmq, gmqAnimal, miseBasPrevue, poidsAnimal } from '../ruminants/calculs';
 import { libelleAnimal, useRuminants } from '../ruminants/donnees';
 import {
@@ -13,7 +14,7 @@ import { gestationParDefaut } from '../reglages';
 import { newId, saveRecord } from '../sync';
 import { Alertes, Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
 
-type Action = 'pesee' | 'soin' | 'repro' | 'misebas' | 'lot' | 'sortie';
+type Action = 'pesee' | 'soin' | 'repro' | 'misebas' | 'lot' | 'sortie' | 'traite' | 'travail';
 
 interface Evt { cle: string; date: string; maj: number; texte: string; supprimer?: () => Promise<void> }
 
@@ -21,6 +22,8 @@ export function AnimalDetail({ id }: { id: string }) {
   const r = useRuminants();
   const [action, setAction] = useState<Action | null>(null);
   const [message, setMessage] = useState('');
+  const ventesT = useItems<Vente>('vente');
+  const paiementsT = useItems<Paiement>('paiement');
   const role = useRole();
   const argent = peut(role, 'argent');
   const ecrit = (c: string) => peutEcrire(role, c);
@@ -62,6 +65,8 @@ export function AnimalDetail({ id }: { id: string }) {
           for (const v of r.pesees.filter((x) => x.animalId === p.id)) await saveRecord('pesee', v.id, dataOf(v), true);
         }
       }) })),
+    ...r.traites.filter((t) => t.animalId === id).map((t) => ({ cle: 't' + t.id, date: t.date, maj: t.updatedAt, texte: `Traite : ${fmtDec(t.litres, 1)} L`, supprimer: () => effacer('traite', t, 'Supprimer cette traite ?') })),
+    ...r.travaux.filter((t) => t.animalId === id).map((t) => ({ cle: 'w' + t.id, date: t.date, maj: t.updatedAt, texte: `Travail : ${fmtDec(t.jours, 1)} j${t.recette ? ` · recette ${fmtFcfa(t.recette)}` : ''}`, supprimer: async () => { if (!window.confirm('Supprimer ce travail (et la recette liée) ?')) return; await supprimerTravail(t, ventesT, paiementsT); setMessage('Saisie supprimée'); } })),
     ...r.mvts.filter((m) => m.animalId === id).map((m) => ({ cle: 'm' + m.id, date: m.date, maj: m.updatedAt,
       texte: m.type === 'entree' ? (m.motif === 'achat' ? 'Entrée : achat' : 'Entrée : naissance') : m.type === 'lot' ? `Changement de lot${m.lotId ? ` : ${r.lots.find((l) => l.id === m.lotId)?.nom ?? ''}` : ' : aucun lot'}` : `Sortie : ${m.motif}`,
       supprimer: m.type === 'entree' || m.venteId ? undefined : () => effacer('mvt_animal', m, 'Annuler ce mouvement ?') }))
@@ -82,6 +87,8 @@ export function AnimalDetail({ id }: { id: string }) {
         <Stat valeur={gmqAnimal(id, r.pesees) !== null ? `${fmtDec(gmqAnimal(id, r.pesees)!, 0)} g/j` : '—'} label="GMQ depuis la 1re pesée" />
         <Stat valeur={lot ? <a href={`#/lots/${lot.id}`}>{lot.nom}</a> : 'Aucun'} label="Lot" />
         {prevue && <Stat valeur={fmtDate(prevue)} label={prevue < today() ? 'Mise bas prévue (en retard)' : 'Mise bas prévue'} />}
+        {a.espece === 'bovin' && a.sexe === 'F' && r.traites.some((t) => t.animalId === id) && <Stat valeur={fmtLitres(litresSur(r.traites, 7, id))} label={`Lait sur 7 jours (${fmtLitres(litresSur(r.traites, 7, id) / 7)} par jour)`} />}
+        {a.espece === 'bovin' && r.travaux.some((t) => t.animalId === id) && <Stat valeur={`${fmtDec(r.travaux.filter((t) => t.animalId === id && joursEntre(t.date, today()) <= 365).reduce((s, t) => s + t.jours, 0), 1)} j`} label={`Travail (12 mois)${argent ? ` · recettes ${fmtFcfa(r.travaux.filter((t) => t.animalId === id && joursEntre(t.date, today()) <= 365).reduce((s, t) => s + t.recette, 0))}` : ''}`} />}
         {argent && a.origine === 'achete' && <Stat valeur={fmtFcfa(a.prixAchat)} label={`Acheté le ${fmtDate(a.dateAchat)}${a.vendeur ? ` à ${a.vendeur}` : ''}`} />}
       </div>
       {message && <p class="succes" role="status">{message}</p>}
@@ -94,6 +101,8 @@ export function AnimalDetail({ id }: { id: string }) {
           {a.sexe === 'F' && ecrit('misebas') && <button class="principal" type="button" onClick={() => setAction('misebas')}><span class="e">🍼</span>Mise bas</button>}
           {ecrit('mvt_animal') && <button class="principal" type="button" onClick={() => setAction('lot')}><span class="e">🧺</span>Changer de lot</button>}
           {ecrit('mvt_animal') && <button class="principal" type="button" onClick={() => setAction('sortie')}><span class="e">🚪</span>Sortie</button>}
+          {a.espece === 'bovin' && a.sexe === 'F' && ecrit('traite') && <button class="principal" type="button" onClick={() => setAction('traite')}><span class="e">🥛</span>Traite</button>}
+          {a.espece === 'bovin' && ecrit('travail') && <button class="principal" type="button" onClick={() => setAction('travail')}><span class="e">🪓</span>Travail</button>}
         </div>
       )}
       {present && !action && argent && <p class="intro">Pour vendre cet animal, utilisez l'onglet Ventes.</p>}
@@ -103,16 +112,21 @@ export function AnimalDetail({ id }: { id: string }) {
       {action === 'repro' && <ReproForm femelle={a} onFini={fini} />}
       {action === 'misebas' && <MiseBasForm mere={a} lotId={etat.lotId} onFini={fini} />}
       {action === 'lot' && <ChangerLot animal={a} lotActuel={etat.lotId} onFini={fini} />}
+      {action === 'traite' && <TraiteForm animalId={id} onFini={fini} />}
+      {action === 'travail' && <TravailForm animal={a} argent={argent} onFini={fini} />}
       {action === 'sortie' && <SortieForm animalId={id} lotId={etat.lotId} soins={r.soins} onFini={fini} />}
 
       {(a.mereId || a.pereId) && (<><h3>Ascendance</h3><Parents animal={a} animaux={r.animaux} niveau={1} /></>)}
+
+      <PhotosAnimal animalId={id} peutAjouter={ecrit('photo')} />
+      <CroissanceAnimal pesees={pesees} />
 
       <h3>Historique</h3>
       <ul>
         {evts.map((e) => (
           <li key={e.cle}>
             <div class="ligne"><span>{e.texte}</span><small>{fmtDate(e.date)}</small></div>
-            {e.supprimer && ecrit({ p: 'pesee', s: 'soin', r: 'repro', b: 'misebas', m: 'mvt_animal' }[e.cle[0]] ?? '') && <button type="button" class="lien" onClick={() => void e.supprimer!()}>Supprimer</button>}
+            {e.supprimer && ecrit({ p: 'pesee', s: 'soin', r: 'repro', b: 'misebas', m: 'mvt_animal', t: 'traite', w: 'travail' }[e.cle[0]] ?? '') && <button type="button" class="lien" onClick={() => void e.supprimer!()}>Supprimer</button>}
           </li>
         ))}
         {evts.length === 0 && <li class="vide">Aucune saisie.</li>}

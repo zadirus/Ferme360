@@ -6,7 +6,7 @@ import type { Article, Client, Paiement, StockMvt, Vente } from './gestion/types
 import { alerteEau, alertes as alertesPoules } from './poules/calculs';
 import { vaccinsAFaire, type LigneProphylaxie } from './poules/programmes';
 import type { Bande, Eau, Mortalite, Ramassage, Sante } from './poules/types';
-import { etatAnimal, finDelaiAttente, miseBasPrevue } from './ruminants/calculs';
+import { etatAnimal, finDelaiAttente, miseBasPrevue, tachesAutomatiques } from './ruminants/calculs';
 import type { Animal, MiseBas, MvtAnimal, Repro, Soin } from './ruminants/types';
 import { REGLAGES } from './reglages';
 
@@ -75,6 +75,12 @@ export function construireAlertes(d: DonneesAlertes, aujourdhui: string): Alerte
       const a = d.animaux.find((x) => x.id === s.animalId);
       out.push({ categorie: 'rappels', texte: `${s.produit}${a ? ` (${etiquette(a)})` : ''} : ${quand(s.rappel)}` });
     }
+  }
+
+  // sevrage et castration à prévoir (aujourd'hui, demain ou en retard)
+  for (const t of tachesAutomatiques(d.animaux, (id) => presents.get(id)?.statut ?? 'present', d.soins, aujourdhui, 1)) {
+    const a = d.animaux.find((x) => x.id === t.animalId)!;
+    out.push({ categorie: 'rappels', texte: `${t.type === 'sevrage' ? 'Sevrage' : 'Castration'} de ${etiquette(a)} : ${quand(t.date)}` });
   }
 
   // mises bas : dans les 7 jours ou en retard

@@ -1,4 +1,5 @@
-import { ajouteJours, joursEntre } from '../format';
+import { ageEnMois, ajouteJours, joursEntre } from '../format';
+import { REGLAGES } from '../reglages';
 import type { Animal, MiseBas, MvtAnimal, Pesee, Ration, Repro, Soin } from './types';
 
 export type Statut = 'present' | 'vendu' | 'mort' | 'abattu' | 'perdu';
@@ -128,4 +129,59 @@ export function indicateursLot(
     coutKgVif: kgVif > 0 && couts.total > 0 ? couts.total / kgVif : null,
     coutKgGagne: gain > 0 && aliment + coutSoins > 0 ? (aliment + coutSoins) / gain : null
   };
+}
+
+// ---------- rappels automatiques, réforme, mortalité des petits ----------
+
+export interface TacheAuto { animalId: string; type: 'sevrage' | 'castration'; date: string; retard: boolean }
+
+// Sevrage et castration à prévoir pour les animaux nés à la ferme (en retard de moins de 60 jours, ou dans l'horizon)
+export function tachesAutomatiques(animaux: Array<Animal & { id: string }>, statut: (id: string) => Statut, soins: Soin[], aujourdhui: string, horizon = 7): TacheAuto[] {
+  const out: TacheAuto[] = [];
+  for (const a of animaux) {
+    if (statut(a.id) !== 'present' || !a.naissance || a.naissanceEstimee) continue;
+    const fait = (type: string) => soins.some((s) => s.animalId === a.id && s.type === type);
+    const prevoir = (type: TacheAuto['type'], jours: number) => {
+      if (jours <= 0 || fait(type)) return;
+      const date = ajouteJours(a.naissance, jours);
+      const ecart = joursEntre(aujourdhui, date);
+      if (ecart <= horizon && ecart >= -60) out.push({ animalId: a.id, type, date, retard: date < aujourdhui });
+    };
+    prevoir('sevrage', a.espece === 'ovin' ? REGLAGES.sevrageOvinJours : REGLAGES.sevrageBovinJours);
+    if (a.sexe === 'M') prevoir('castration', REGLAGES.castrationJours);
+  }
+  return out.sort((x, y) => x.date.localeCompare(y.date));
+}
+
+export interface PropositionReforme { animalId: string; raisons: string[] }
+
+// Animaux à examiner pour une réforme : âge, saillies sans mise bas, soins répétés
+export function propositionsReforme(animaux: Array<Animal & { id: string }>, statut: (id: string) => Statut, repro: Repro[], misesBas: MiseBas[], soins: Soin[], aujourdhui: string): PropositionReforme[] {
+  const out: PropositionReforme[] = [];
+  for (const a of animaux) {
+    if (statut(a.id) !== 'present') continue;
+    const raisons: string[] = [];
+    const limite = a.espece === 'ovin' ? REGLAGES.reformeOvinAns : REGLAGES.reformeBovinAns;
+    if (limite > 0 && a.naissance && ageEnMois(a.naissance, aujourdhui) >= limite * 12) raisons.push(`âge : ${Math.floor(ageEnMois(a.naissance, aujourdhui) / 12)} ans`);
+    if (a.sexe === 'F') {
+      const rates = repro.filter((r) => r.femelleId === a.id && r.type === 'saillie' && joursEntre(r.date, aujourdhui) > r.gestationJours + 45 && !misesBas.some((m) => m.mereId === a.id && m.date >= r.date && joursEntre(r.date, m.date) <= r.gestationJours + 45)).length;
+      if (rates >= 2) raisons.push(`${rates} saillies sans mise bas`);
+    }
+    const traitements = soins.filter((s) => s.animalId === a.id && s.type === 'traitement' && joursEntre(s.date, aujourdhui) <= 365).length;
+    if (traitements >= 3) raisons.push(`${traitements} traitements en un an`);
+    if (raisons.length) out.push({ animalId: a.id, raisons });
+  }
+  return out;
+}
+
+// Mortalité avant sevrage : (mort-nés + petits nés à la ferme morts avant l'âge du sevrage) ÷ petits nés × 100
+export function mortaliteAvantSevrage(espece: 'ovin' | 'bovin', animaux: Array<Animal & { id: string }>, mvts: Array<MvtAnimal & { updatedAt: number }>, misesBas: MiseBas[]): number | null {
+  const meres = new Set(animaux.filter((a) => a.espece === espece).map((a) => a.id));
+  const mb = misesBas.filter((m) => meres.has(m.mereId));
+  const nes = mb.reduce((s, m) => s + m.vivants + m.mortNes, 0);
+  if (!nes) return null;
+  const jours = espece === 'ovin' ? REGLAGES.sevrageOvinJours : REGLAGES.sevrageBovinJours;
+  const petits = animaux.filter((a) => a.espece === espece && a.miseBasId && a.naissance);
+  const morts = petits.filter((a) => mvts.some((m) => m.animalId === a.id && m.type === 'sortie' && m.motif === 'mort' && joursEntre(a.naissance, m.date) <= jours)).length;
+  return ((mb.reduce((s, m) => s + m.mortNes, 0) + morts) / nes) * 100;
 }

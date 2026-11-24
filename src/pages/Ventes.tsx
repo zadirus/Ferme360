@@ -83,7 +83,7 @@ interface Ligne {
   mode: 'poids' | 'tete';
 }
 
-const UNITE_PAR_ARTICLE: Record<LigneVente['article'], LigneVente['unite']> = { oeufs: 'plateau', fumier: 'sac', animal: 'kg', autre: 'unite' };
+const UNITE_PAR_ARTICLE: Record<LigneVente['article'], LigneVente['unite']> = { oeufs: 'plateau', fumier: 'sac', animal: 'kg', lait: 'litre', autre: 'unite' };
 
 export function NouvelleVente({ clientInitial }: { clientInitial: string }) {
   const clients = useItems<Client>('client');
@@ -201,8 +201,9 @@ export function NouvelleVente({ clientInitial }: { clientInitial: string }) {
               onChange={(a) => {
                 const unite = UNITE_PAR_ARTICLE[a];
                 modif(i, { article: a, unite, prix: prixPropose(a, unite) });
+                if (a === 'lait') setActivite('bovins');
               }}
-              options={[['oeufs', 'Œufs'], ['animal', 'Animal (mouton, bœuf)'], ['fumier', 'Fientes / fumier'], ['autre', 'Autre']]}
+              options={[['oeufs', 'Œufs'], ['animal', 'Animal (mouton, bœuf)'], ['lait', 'Lait'], ['fumier', 'Fientes / fumier'], ['autre', 'Autre']]}
             />
             {l.article === 'animal' && (
               <>
@@ -227,6 +228,8 @@ export function NouvelleVente({ clientInitial }: { clientInitial: string }) {
             )}
             {l.article === 'animal' ? null : l.article === 'oeufs' ? (
               <Choix label="Unité" value={l.unite} onChange={(u) => modif(i, { unite: u, prix: prixPropose('oeufs', u) })} options={[['plateau', 'Plateau (30 œufs)'], ['oeuf', 'Œuf à l’unité']]} />
+            ) : l.article === 'lait' ? (
+              <Choix label="Unité" value={l.unite} onChange={(u) => modif(i, { unite: u })} options={[['litre', 'Litre']]} />
             ) : (
               <Choix label="Unité" value={l.unite} onChange={(u) => modif(i, { unite: u })} options={[['sac', 'Sac'], ['unite', 'Unité']]} />
             )}

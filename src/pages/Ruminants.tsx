@@ -3,7 +3,8 @@ import { go, useRole } from '../hooks';
 import { peut, peutEcrire } from '../droits';
 import { ageEnMois, fmtDate, fmtDec, fmtInt, fmtPct, joursEntre, today } from '../format';
 import { COMPTES, type Achat, type Compte } from '../gestion/types';
-import { dernierPoids, fertilite, miseBasPrevue, prolificite } from '../ruminants/calculs';
+import { dernierPoids, fertilite, miseBasPrevue, mortaliteAvantSevrage, prolificite } from '../ruminants/calculs';
+import { fmtLitres, litresSur, ParcsListe, TachesEtReforme } from './RuminantsExtras';
 import { libelleAnimal, useRuminants } from '../ruminants/donnees';
 import { ACTIVITE_ESPECE, ICONE_ESPECE, NOM_ESPECE, NOM_ESPECES, RACES, type Animal, type Espece, type Lot, type MvtAnimal, type Pesee } from '../ruminants/types';
 import { newId, saveRecord } from '../sync';
@@ -35,6 +36,8 @@ export function Ruminants({ espece }: { espece: Espece }) {
   const mbE = r.misesBas.filter((x) => idsEspece.has(x.mereId));
   const fert = fertilite(reproE, mbE);
   const prolif = prolificite(mbE);
+  const mortSevrage = mortaliteAvantSevrage(espece, tous, r.mvts, r.misesBas);
+  const lait = espece === 'bovin' ? litresSur(r.traites.filter((t) => idsEspece.has(t.animalId)), 7) : 0;
   const aVenir = presents
     .filter((a) => a.sexe === 'F')
     .map((a) => ({ a, date: miseBasPrevue(a.id, r.repro, r.misesBas) }))
@@ -52,6 +55,8 @@ export function Ruminants({ espece }: { espece: Espece }) {
         <Stat valeur={`${femelles} F · ${presents.length - femelles} M`} label="femelles · mâles" />
         {fert !== null && <Stat valeur={fmtPct(fert)} label="Fertilité" />}
         {prolif !== null && <Stat valeur={fmtDec(prolif, 2)} label="Prolificité (petits par mise bas)" />}
+        {mortSevrage !== null && <Stat valeur={fmtPct(mortSevrage)} label="Mortalité avant sevrage" />}
+        {lait > 0 && <Stat valeur={fmtLitres(lait)} label="Lait trait sur 7 jours" />}
       </div>
       {message && <p class="succes" role="status">{message}</p>}
       {!mode && (
@@ -62,6 +67,9 @@ export function Ruminants({ espece }: { espece: Espece }) {
       )}
       {mode === 'animal' && <AnimalForm espece={espece} onFini={fini} />}
       {mode === 'lot' && <LotForm espece={espece} onFini={fini} />}
+
+      <TachesEtReforme espece={espece} />
+      <ParcsListe peutCreer={peutEcrire(role, 'parc')} />
 
       {aVenir.length > 0 && (
         <>

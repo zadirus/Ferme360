@@ -74,3 +74,12 @@ Avant de livrer : `npm run build` doit passer.
 - Courbe de ponte (`src/courbe.tsx`, SVG) : taux de la bande selon l'âge en semaines, comparé à la courbe de référence. Bilan de bande : coût du plateau = (prix d'achat + aliment) ÷ plateaux de bons œufs ; marge estimée avec le prix moyen de vente de l'œuf.
 - L'accueil utilise `construireAlertes` (src/alertes.ts) : mêmes alertes à l'écran et dans les notifications.
 - Test : `e2e/poules2.cjs`.
+
+## Moutons et bœufs : compléments (étape 7, lot 4)
+- Réglages ajoutés (src/reglages.ts) : sevrage ovin 90 j, bovin 210 j, castration 60 j (0 = aucun), âge de réforme ovin 7 ans / bovin 10 ans. Ce sont des valeurs de départ, modifiables.
+- `tachesAutomatiques` (sevrage, castration des mâles nés à la ferme ; en retard de moins de 60 jours ou sous 7 jours ; disparaît quand un soin du même type est enregistré), `propositionsReforme` (âge, ≥ 2 saillies sans mise bas, ≥ 3 traitements en 12 mois), `mortaliteAvantSevrage` : `src/ruminants/calculs.ts`. Les rappels sont aussi dans `construireAlertes` (notifications).
+- Photos : collection `photo`, image JPEG réduite à ≤ 70 000 caractères (`src/photo.ts`) pour tenir dans un enregistrement synchronisé (limite serveur 100 000) ; pas de stockage de fichiers (R2 non utilisé).
+- Parcs : `parc` + `pature` (entrée/sortie d'un lot) ; le parc actuel d'un lot est DÉDUIT du dernier mouvement (`src/ruminants/parcs.ts`) ; alerte de surcharge si capacité dépassée.
+- Lait : `traite` (litres) + vente article `lait` (unité litre, activité bovins). Traction : `travail` (jours, recette) ; une recette crée une vente + son paiement (supprimés avec le travail).
+- Courbes de croissance : `src/courbe.tsx` (animal et moyenne du lot).
+- Test : `e2e/ruminants2.cjs`.

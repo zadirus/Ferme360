@@ -15,6 +15,11 @@ const CHAMPS: Array<[keyof TypeReglages, string, string]> = [
   ['poidsOeufG', 'Poids moyen d’un œuf (indice de consommation)', 'g'],
   ['gestationOvin', 'Gestation de la brebis (mise bas prévue)', 'jours'],
   ['gestationBovin', 'Gestation de la vache (mise bas prévue)', 'jours'],
+  ['sevrageOvinJours', 'Rappel de sevrage des agneaux (0 = aucun)', 'jours après la naissance'],
+  ['sevrageBovinJours', 'Rappel de sevrage des veaux (0 = aucun)', 'jours après la naissance'],
+  ['castrationJours', 'Rappel de castration des mâles (0 = aucun)', 'jours après la naissance'],
+  ['reformeOvinAns', 'Proposer à la réforme un mouton de plus de', 'ans'],
+  ['reformeBovinAns', 'Proposer à la réforme un bœuf de plus de', 'ans'],
   ['eauBaissePct', 'Alerte si l’eau bue par poule baisse de', '%'],
   ['heureNotif', 'Heure des notifications du matin (0 à 23)', 'h'],
   ['decalageUtc', 'Décalage horaire de la ferme (0 en Côte d’Ivoire et au Sénégal, 1 au Bénin et au Cameroun)', 'h']

@@ -106,3 +106,39 @@ export interface Ration {
   cout: number;
   note: string;
 }
+
+export interface Parc {
+  nom: string;
+  capacite: number; // nombre d'animaux que le parc peut porter (0 = non précisé)
+  note: string;
+}
+
+// Mouvements de lots dans les parcs : le parc actuel d'un lot est déduit du dernier mouvement
+export interface Pature {
+  lotId: string;
+  parcId: string;
+  date: string;
+  type: 'entree' | 'sortie';
+}
+
+export interface Traite {
+  animalId: string;
+  date: string;
+  litres: number;
+}
+
+export interface Travail {
+  animalId: string;
+  date: string;
+  jours: number;
+  recette: number;
+  venteId: string; // vente créée si le bœuf est loué
+  note: string;
+}
+
+export interface Photo {
+  animalId: string;
+  date: string;
+  image: string; // photo réduite (JPEG, adresse de données) pour tenir dans la synchronisation
+  legende: string;
+}
