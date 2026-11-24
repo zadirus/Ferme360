@@ -23,3 +23,13 @@ export function joursEntre(a: string, b: string): number {
   };
   return Math.round((t(b) - t(a)) / 86_400_000);
 }
+
+export function ajouteJours(iso: string, n: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + n));
+  return `${t.getUTCFullYear()}-${p2(t.getUTCMonth() + 1)}-${p2(t.getUTCDate())}`;
+}
+
+export function ageEnMois(naissance: string, aujourdhui: string): number {
+  return Math.max(0, Math.floor(joursEntre(naissance, aujourdhui) / 30.4375));
+}

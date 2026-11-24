@@ -7,6 +7,10 @@ import { Accueil } from './pages/Accueil';
 import { BandeDetail } from './pages/BandeDetail';
 import { Oeufs } from './pages/Oeufs';
 import { Poules } from './pages/Poules';
+import { AnimalDetail } from './pages/Animal';
+import { Elevage } from './pages/Elevage';
+import { LotDetail } from './pages/Lot';
+import { Ruminants } from './pages/Ruminants';
 import { Argent } from './pages/Argent';
 import { ArticleDetail, Stocks } from './pages/Stocks';
 import { ClientDetail, Clients, NouvelleVente, Ventes } from './pages/Ventes';
@@ -15,7 +19,7 @@ import { getToken, getUser, type User } from './session';
 
 const ONGLETS: Array<[string, string, string]> = [
   ['/', 'Accueil', '🏠'],
-  ['/poules', 'Poules', '🐔'],
+  ['/elevage', 'Élevage', '🐾'],
   ['/ventes', 'Ventes', '🧾'],
   ['/stocks', 'Stocks', '📦'],
   ['/argent', 'Argent', '💰']
@@ -56,12 +60,17 @@ export function App() {
   else if (route.startsWith('/stocks/')) page = <ArticleDetail id={route.slice('/stocks/'.length)} />;
   else if (route === '/argent') page = <Argent />;
   else if (route === '/poules') page = <Poules />;
+  else if (route === '/elevage') page = <Elevage />;
+  else if (route === '/moutons') page = <Ruminants espece="ovin" />;
+  else if (route === '/boeufs') page = <Ruminants espece="bovin" />;
+  else if (route.startsWith('/animaux/')) page = <AnimalDetail key={route} id={route.slice('/animaux/'.length)} />;
+  else if (route.startsWith('/lots/')) page = <LotDetail key={route} id={route.slice('/lots/'.length)} />;
   else if (route === '/oeufs') page = <Oeufs />;
   else if (route === '/carnet') page = <Carnet />;
   else page = <Accueil />;
 
   const actif = (p: string) =>
-    p === '/' ? route === '/' : p === '/poules' ? route.startsWith('/poules') || route === '/oeufs' : p === '/ventes' ? route.startsWith('/ventes') || route.startsWith('/clients') : route.startsWith(p);
+    p === '/' ? route === '/' : p === '/elevage' ? ['/elevage', '/poules', '/oeufs', '/moutons', '/boeufs', '/animaux', '/lots'].some((x) => route.startsWith(x)) : p === '/ventes' ? route.startsWith('/ventes') || route.startsWith('/clients') : route.startsWith(p);
 
   return (
     <>

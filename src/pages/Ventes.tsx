@@ -1,9 +1,12 @@
 import { useState } from 'preact/hooks';
 import { dataOf, useItems } from '../hooks';
-import { fmtDate, fmtFcfa, fmtInt, today } from '../format';
+import { fmtDate, fmtDec, fmtFcfa, fmtInt, today } from '../format';
 import { clientDe, compteDuMode, creances, oeufsVendus, totalLignes } from '../gestion/calculs';
 import { ACTIVITES, type Activite, type Client, type LigneVente, type Paiement, type Vente } from '../gestion/types';
 import { stockOeufs } from '../poules/calculs';
+import { dernierPoids, finDelaiAttente } from '../ruminants/calculs';
+import { libelleAnimal, useRuminants } from '../ruminants/donnees';
+import { ACTIVITE_ESPECE, type MvtAnimal } from '../ruminants/types';
 import type { MvtOeufs, Ramassage } from '../poules/types';
 import { newId, saveRecord } from '../sync';
 import { Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
@@ -21,6 +24,13 @@ const MODES: Array<[Paiement['mode'], string]> = [
   ['mobile_money', 'Mobile Money'],
   ['virement', 'Virement']
 ];
+
+const resumeLigne = (l: LigneVente) =>
+  l.article === 'oeufs'
+    ? `${fmtInt(l.quantite)} ${l.unite === 'plateau' ? 'plateau(x) d’œufs' : 'œuf(s)'}`
+    : l.article === 'animal'
+      ? `${l.libelle}${l.unite === 'kg' ? ` (${fmtDec(l.quantite, 0)} kg à ${fmtFcfa(l.prixUnitaire)}/kg)` : ''}`
+      : `${fmtInt(l.quantite)} ${l.libelle || (l.article === 'fumier' ? 'fientes / fumier' : l.article)}`;
 
 export function Ventes() {
   const ventes = useItems<Vente>('vente');
@@ -55,7 +65,7 @@ export function Ventes() {
               <span class="montant">{fmtFcfa(v.total)}</span>
             </div>
             <small>
-              {fmtDate(v.date)} · {v.lignes.map((l) => `${fmtInt(l.quantite)} ${l.article === 'oeufs' ? (l.unite === 'plateau' ? 'plateau(x) d’œufs' : 'œuf(s)') : l.libelle || l.article}`).join(', ')}
+              {fmtDate(v.date)} · {v.lignes.map(resumeLigne).join(', ')}
             </small>
             {paye(v) >= v.total - 0.5 ? <span class="badge">Payé</span> : <span class="badge ambre">À crédit</span>}
           </li>
@@ -72,22 +82,25 @@ interface Ligne {
   quantite: string;
   unite: LigneVente['unite'];
   prix: string;
+  animalId: string;
+  mode: 'poids' | 'tete';
 }
 
-const UNITE_PAR_ARTICLE: Record<LigneVente['article'], LigneVente['unite']> = { oeufs: 'plateau', fumier: 'sac', autre: 'unite' };
+const UNITE_PAR_ARTICLE: Record<LigneVente['article'], LigneVente['unite']> = { oeufs: 'plateau', fumier: 'sac', animal: 'kg', autre: 'unite' };
 
 export function NouvelleVente({ clientInitial }: { clientInitial: string }) {
   const clients = useItems<Client>('client');
   const ventes = useItems<Vente>('vente');
   const ram = useItems<Ramassage>('ramassage');
   const mvts = useItems<MvtOeufs>('oeufs_mvt');
+  const rum = useRuminants();
   const [date, setDate] = useState(today());
   const [clientSel, setClientSel] = useState(clientInitial || 'comptoir');
   const [nom, setNom] = useState('');
   const [tel, setTel] = useState('');
   const [typeClient, setTypeClient] = useState<Client['type']>('revendeur');
   const [activite, setActivite] = useState<Activite>('poules');
-  const [lignes, setLignes] = useState<Ligne[]>([{ article: 'oeufs', libelle: '', quantite: '', unite: 'plateau', prix: '' }]);
+  const [lignes, setLignes] = useState<Ligne[]>([{ article: 'oeufs', libelle: '', quantite: '', unite: 'plateau', prix: '', animalId: '', mode: 'poids' }]);
   const [paye, setPaye] = useState<string | null>(null);
   const [mode, setMode] = useState<Paiement['mode']>('especes');
   const [erreur, setErreur] = useState('');
@@ -103,7 +116,21 @@ export function NouvelleVente({ clientInitial }: { clientInitial: string }) {
   }
 
   const modif = (i: number, patch: Partial<Ligne>) => setLignes(lignes.map((l, k) => (k === i ? { ...l, ...patch } : l)));
-  const nombres: LigneVente[] = lignes.map((l) => ({ article: l.article, libelle: l.libelle.trim(), quantite: nombre(l.quantite), unite: l.unite, prixUnitaire: nombre(l.prix) }));
+  const animalDe = (id: string) => rum.animaux.find((a) => a.id === id);
+  const blocage = (l: Ligne): string | null => {
+    const a = l.article === 'animal' ? animalDe(l.animalId) : undefined;
+    if (!a) return null;
+    const fin = finDelaiAttente(a.id, rum.etat(a.id).lotId, rum.soins, date);
+    return fin ? `${libelleAnimal(a)} : vente interdite jusqu'au ${fmtDate(fin)} (délai d'attente après un soin).` : null;
+  };
+  const nombres: LigneVente[] = lignes.map((l) => {
+    if (l.article === 'animal') {
+      const a = animalDe(l.animalId);
+      const poids = l.mode === 'poids';
+      return { article: 'animal', libelle: a ? libelleAnimal(a) : '', quantite: poids ? nombre(l.quantite) : a ? 1 : 0, unite: poids ? 'kg' : 'tete', prixUnitaire: nombre(l.prix), animalId: l.animalId };
+    }
+    return { article: l.article, libelle: l.libelle.trim(), quantite: nombre(l.quantite), unite: l.unite, prixUnitaire: nombre(l.prix) };
+  });
   const total = totalLignes(nombres);
   const comptant = clientSel === 'comptoir';
   const montantPaye = comptant ? total : paye === null ? total : nombre(paye);
@@ -114,6 +141,10 @@ export function NouvelleVente({ clientInitial }: { clientInitial: string }) {
     const valides = nombres.filter((l) => l.quantite > 0);
     if (!valides.length || valides.some((l) => l.prixUnitaire < 0)) return setErreur('Indiquez au moins une quantité et un prix.');
     if (valides.some((l) => l.article === 'autre' && !l.libelle)) return setErreur('Précisez ce que vous vendez (ligne « Autre »).');
+    if (lignes.some((l) => l.article === 'animal' && !l.animalId)) return setErreur('Choisissez l’animal vendu.');
+    const ids = valides.filter((l) => l.animalId).map((l) => l.animalId);
+    if (new Set(ids).size !== ids.length) return setErreur('Le même animal est dans deux lignes.');
+    for (const l of lignes) { const b = blocage(l); if (b) return setErreur(b); }
     if (clientSel === '__nouveau' && !nom.trim()) return setErreur('Indiquez le nom du client.');
     if (montantPaye < 0 || montantPaye > total + 0.5) return setErreur('Le montant payé ne peut pas dépasser le total.');
     const oeufs = oeufsVendus(valides);
@@ -133,6 +164,9 @@ export function NouvelleVente({ clientInitial }: { clientInitial: string }) {
     }
     if (montantPaye > 0) {
       await saveRecord('paiement', newId(), { date, clientId: cid, venteId, montant: montantPaye, mode, note: '' } satisfies Paiement);
+    }
+    for (const l of valides.filter((x) => x.animalId)) {
+      await saveRecord('mvt_animal', newId(), { animalId: l.animalId!, date, type: 'sortie', motif: 'vente', lotId: '', venteId, note: '' } satisfies MvtAnimal);
     }
     go(cid ? `/clients/${cid}` : '/ventes');
   }
@@ -171,22 +205,41 @@ export function NouvelleVente({ clientInitial }: { clientInitial: string }) {
                 const unite = UNITE_PAR_ARTICLE[a];
                 modif(i, { article: a, unite, prix: prixPropose(a, unite) });
               }}
-              options={[['oeufs', 'Œufs'], ['fumier', 'Fientes / fumier'], ['autre', 'Autre']]}
+              options={[['oeufs', 'Œufs'], ['animal', 'Animal (mouton, bœuf)'], ['fumier', 'Fientes / fumier'], ['autre', 'Autre']]}
             />
+            {l.article === 'animal' && (
+              <>
+                <Choix
+                  label="Animal vendu"
+                  value={l.animalId}
+                  onChange={(aid) => {
+                    const a = animalDe(aid);
+                    const p = a ? dernierPoids(a.id, rum.pesees) : null;
+                    modif(i, { animalId: aid, quantite: p ? String(p) : l.quantite });
+                    if (a) setActivite(ACTIVITE_ESPECE[a.espece]);
+                  }}
+                  options={[['', 'Choisir un animal…'], ...rum.animaux.filter((a) => rum.statut(a.id) === 'present' && (a.id === l.animalId || !lignes.some((x) => x.animalId === a.id))).sort((x, y) => x.boucle.localeCompare(y.boucle, 'fr', { numeric: true })).map((a) => [a.id, `${libelleAnimal(a)} (${a.espece === 'ovin' ? 'mouton' : 'bœuf'})`] as [string, string])]}
+                />
+                <Choix label="Mode de vente" value={l.mode} onChange={(m) => modif(i, { mode: m })} options={[['poids', 'Au poids (prix au kg)'], ['tete', 'Sur pied (prix de la tête)']]} />
+                {blocage(l) && <p class="erreur">{blocage(l)}</p>}
+              </>
+            )}
             {l.article === 'autre' && <Champ label="Désignation" value={l.libelle} onChange={(v) => modif(i, { libelle: v })} />}
-            <Champ label="Quantité" type="number" min={0} value={l.quantite} onChange={(v) => modif(i, { quantite: v, prix: l.prix || prixPropose(l.article, l.unite) })} />
-            {l.article === 'oeufs' ? (
+            {(l.article !== 'animal' || l.mode === 'poids') && (
+              <Champ label={l.article === 'animal' ? 'Poids' : 'Quantité'} type="number" min={0} value={l.quantite} suffixe={l.article === 'animal' ? 'kg' : undefined} onChange={(v) => modif(i, { quantite: v, prix: l.prix || prixPropose(l.article, l.unite) })} />
+            )}
+            {l.article === 'animal' ? null : l.article === 'oeufs' ? (
               <Choix label="Unité" value={l.unite} onChange={(u) => modif(i, { unite: u, prix: prixPropose('oeufs', u) })} options={[['plateau', 'Plateau (30 œufs)'], ['oeuf', 'Œuf à l’unité']]} />
             ) : (
               <Choix label="Unité" value={l.unite} onChange={(u) => modif(i, { unite: u })} options={[['sac', 'Sac'], ['unite', 'Unité']]} />
             )}
-            <Champ label="Prix unitaire" type="number" min={0} value={l.prix} onChange={(v) => modif(i, { prix: v })} suffixe="FCFA" />
+            <Champ label={l.article === 'animal' ? (l.mode === 'poids' ? 'Prix au kg' : 'Prix de la tête') : 'Prix unitaire'} type="number" min={0} value={l.prix} onChange={(v) => modif(i, { prix: v })} suffixe="FCFA" />
             {lignes.length > 1 && (
               <button type="button" class="lien" onClick={() => setLignes(lignes.filter((_, k) => k !== i))}>Retirer cet article</button>
             )}
           </div>
         ))}
-        <button type="button" class="secondaire" onClick={() => setLignes([...lignes, { article: 'oeufs', libelle: '', quantite: '', unite: 'plateau', prix: prixPropose('oeufs', 'plateau') }])}>
+        <button type="button" class="secondaire" onClick={() => setLignes([...lignes, { article: 'oeufs', libelle: '', quantite: '', unite: 'plateau', prix: prixPropose('oeufs', 'plateau'), animalId: '', mode: 'poids' }])}>
           + Ajouter un article
         </button>
 
@@ -239,6 +292,7 @@ export function ClientDetail({ id }: { id: string }) {
   const ventes = useItems<Vente>('vente').filter((v) => v.clientId === id);
   const paiements = useItems<Paiement>('paiement').filter((p) => p.clientId === id);
   const mvts = useItems<MvtOeufs>('oeufs_mvt');
+  const mvtsAnimaux = useItems<MvtAnimal>('mvt_animal');
   const allPaiements = useItems<Paiement>('paiement');
   const [encaisser, setEncaisser] = useState(false);
   const [message, setMessage] = useState('');
@@ -254,9 +308,10 @@ export function ClientDetail({ id }: { id: string }) {
   ].sort((a, b) => b.date.localeCompare(a.date) || b.maj - a.maj);
 
   async function supprimerVente(v: (typeof ventes)[number]) {
-    if (!window.confirm('Supprimer cette vente, ses paiements et la sortie d’œufs liée ?')) return;
+    if (!window.confirm('Supprimer cette vente, ses paiements et les sorties (œufs, animaux) liées ? Les animaux reviennent dans le registre.')) return;
     await saveRecord('vente', v.id, dataOf(v), true);
     for (const m of mvts.filter((x) => x.venteId === v.id)) await saveRecord('oeufs_mvt', m.id, dataOf(m), true);
+    for (const m of mvtsAnimaux.filter((x) => x.venteId === v.id)) await saveRecord('mvt_animal', m.id, dataOf(m), true);
     for (const p of allPaiements.filter((x) => x.venteId === v.id)) await saveRecord('paiement', p.id, dataOf(p), true);
     setMessage('Vente supprimée');
   }
@@ -288,7 +343,7 @@ export function ClientDetail({ id }: { id: string }) {
         {evenements.map((ev) => (
           <li key={ev.cle}>
             <div class="ligne"><span>{ev.texte}</span><small>{fmtDate(ev.date)}</small></div>
-            {ev.vente && <small>{ev.vente.lignes.map((l) => `${fmtInt(l.quantite)} ${l.article === 'oeufs' ? (l.unite === 'plateau' ? 'plateau(x)' : 'œuf(s)') : l.libelle || l.article} à ${fmtFcfa(l.prixUnitaire)}`).join(' · ')}</small>}
+            {ev.vente && <small>{ev.vente.lignes.map((l) => (l.article === 'animal' ? resumeLigne(l) : `${resumeLigne(l)} à ${fmtFcfa(l.prixUnitaire)}`)).join(' · ')}</small>}
             <button type="button" class="lien" onClick={() => void (ev.vente ? supprimerVente(ev.vente) : supprimerPaiement(ev.paiement!))}>Supprimer</button>
           </li>
         ))}

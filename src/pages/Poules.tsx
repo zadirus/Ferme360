@@ -41,7 +41,7 @@ export function Poules() {
 
   return (
     <section>
-      <Retour vers="/" texte="Accueil" />
+      <Retour vers="/elevage" texte="Élevage" />
       <h2>Poules pondeuses</h2>
       {!creation && (
         <button class="principal" type="button" onClick={() => setCreation(true)}>

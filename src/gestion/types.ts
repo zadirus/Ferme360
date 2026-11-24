@@ -22,11 +22,12 @@ export interface Client {
 }
 
 export interface LigneVente {
-  article: 'oeufs' | 'fumier' | 'autre';
+  article: 'oeufs' | 'fumier' | 'animal' | 'autre';
   libelle: string;
-  quantite: number;
-  unite: 'plateau' | 'oeuf' | 'sac' | 'unite';
-  prixUnitaire: number;
+  quantite: number; // animal : poids en kg (vente au poids) ou 1 (vente sur pied)
+  unite: 'plateau' | 'oeuf' | 'sac' | 'unite' | 'kg' | 'tete';
+  prixUnitaire: number; // animal : prix au kg ou prix de la tête
+  animalId?: string;
 }
 
 export interface Vente {
@@ -71,6 +72,7 @@ export interface Achat {
   montantPaye: number;
   compte: Compte;
   peremption: string;
+  animalId?: string; // achat d'un animal
 }
 
 export interface Reglement {
@@ -99,6 +101,7 @@ export interface Depense {
   libelle: string;
   montant: number;
   compte: Compte;
+  soinId?: string; // dépense créée par un soin vétérinaire
 }
 
 export const CATEGORIES_DEPENSE = ['Électricité et eau', 'Transport', 'Main-d’œuvre', 'Réparations', 'Soins vétérinaires', 'Autre'];

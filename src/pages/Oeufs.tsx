@@ -28,7 +28,7 @@ export function Oeufs() {
 
   return (
     <section>
-      <Retour vers="/" texte="Accueil" />
+      <Retour vers="/elevage" texte="Élevage" />
       <h2>Stock d'œufs</h2>
       <p class="intro">Pour vendre des œufs, utilisez l'onglet Ventes : la sortie du stock se fait toute seule.</p>
       <div class="stats">

@@ -5,6 +5,9 @@ import type { Achat, Article, Client, Depense, Paiement, Reglement, StockMvt, Tr
 import { alertes, effectifActuel, stockOeufs } from '../poules/calculs';
 import type { Bande, Mortalite, MvtOeufs, Ramassage, Sante } from '../poules/types';
 import { getUser } from '../session';
+import { miseBasPrevue } from '../ruminants/calculs';
+import { libelleAnimal, useRuminants } from '../ruminants/donnees';
+import { NOM_SOIN } from '../ruminants/types';
 import { Alertes } from '../ui';
 
 export function Accueil() {
@@ -22,6 +25,7 @@ export function Accueil() {
   const reglements = useItems<Reglement>('reglement');
   const depenses = useItems<Depense>('depense');
   const ajustements = useItems<TresoMvt>('treso_mvt');
+  const rum = useRuminants();
 
   const effectif = bandes.reduce((s, b) => s + effectifActuel(b, morts.filter((m) => m.bandeId === b.id)), 0);
   const stockO = stockOeufs(ram, mvts);
@@ -31,7 +35,16 @@ export function Accueil() {
   const tresorerie = soldes.caisse + soldes.mobile_money + soldes.banque;
   const alertesStock = articles.flatMap((a) => alertesArticle(a, stockMvts.filter((m) => m.articleId === a.id), today()));
 
+  const presents = (e: 'ovin' | 'bovin') => rum.animaux.filter((a) => a.espece === e && rum.statut(a.id) === 'present');
+  const misesBas = presents('ovin').concat(presents('bovin'))
+    .filter((a) => a.sexe === 'F')
+    .map((a) => ({ a, date: miseBasPrevue(a.id, rum.repro, rum.misesBas) }))
+    .filter((x): x is { a: (typeof rum.animaux)[number]; date: string } => !!x.date && joursEntre(today(), x.date) <= 30)
+    .sort((x, y) => x.date.localeCompare(y.date));
+  const rappelsAnimaux = rum.soins.filter((s) => s.rappel && joursEntre(today(), s.rappel) <= 14);
+
   const toutes = [
+    ...misesBas.filter((m) => m.date < today()).map((m) => `${libelleAnimal(m.a)} : mise bas en retard (prévue le ${fmtDate(m.date)})`),
     ...bandes.flatMap((b) =>
       alertes(b, ram.filter((r) => r.bandeId === b.id), morts.filter((m) => m.bandeId === b.id)).map((a) => `${b.nom} : ${a}`)
     ),
@@ -100,23 +113,53 @@ export function Accueil() {
           </a>
         </li>
         <li>
-          <div class="tuile inactive">
+          <a class="tuile" href="#/moutons">
             <span class="ico">🐑</span>
-            <span class="gros">Moutons</span>
-            <span class="petit">bientôt</span>
-          </div>
+            <span class="gros">{fmtInt(presents('ovin').length)}</span>
+            <span class="petit">moutons</span>
+          </a>
         </li>
         <li>
-          <div class="tuile inactive">
+          <a class="tuile" href="#/boeufs">
             <span class="ico">🐄</span>
-            <span class="gros">Bœufs</span>
-            <span class="petit">bientôt</span>
-          </div>
+            <span class="gros">{fmtInt(presents('bovin').length)}</span>
+            <span class="petit">bœufs</span>
+          </a>
         </li>
       </ul>
+      {misesBas.length > 0 && (
+        <>
+          <h3>Mises bas prévues</h3>
+          <ul>
+            {misesBas.map(({ a, date }) => (
+              <li key={a.id}>
+                <a class="carte" href={`#/animaux/${a.id}`}>
+                  <strong>{libelleAnimal(a)}</strong>
+                  <span>{date < today() ? `en retard · prévue le ${fmtDate(date)}` : `le ${fmtDate(date)}`}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {rappelsAnimaux.length > 0 && (
+        <>
+          <h3>Rappels de soins (moutons, bœufs)</h3>
+          <ul>
+            {rappelsAnimaux.map((s) => (
+              <li key={s.id}>
+                <div class="ligne">
+                  <span>{NOM_SOIN[s.type]} : {s.produit}</span>
+                  <small>{s.rappel < today() ? `en retard (${fmtDate(s.rappel)})` : `le ${fmtDate(s.rappel)}`}</small>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       {rappels.length > 0 && (
         <>
-          <h3>Rappels de santé</h3>
+          <h3>Rappels de santé (poules)</h3>
           <ul>
             {rappels.map((s) => (
               <li key={s.id}>

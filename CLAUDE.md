@@ -30,3 +30,14 @@ Avant de livrer : `npm run build` doit passer.
 - Argent : soldes caisse / Mobile Money / banque calculés (paiements − achats payés − règlements − dépenses ± corrections) ; résultat par activité = ventes − achats − dépenses (achats comptés à la date d'achat ; charges « commun » non réparties pour l'instant).
 - Écrans : `useItems` (src/hooks.ts) lit un instantané unique rechargé en bloc après chaque saisie ; `saveRecord` rend la main une fois les écrans à jour.
 - Test de parcours complet : `npx wrangler dev --port 8790` puis `BASE=http://localhost:8790 node e2e/etape4.cjs` (Playwright).
+
+## Moutons et bœufs (étape 5)
+- Collections : `animal`, `mvt_animal`, `lot`, `pesee`, `repro`, `misebas`, `soin`, `ration` (types : `src/ruminants/types.ts` ; calculs testés : `src/ruminants/calculs.ts`). Un seul module pour les deux espèces (`espece: 'ovin' | 'bovin'`).
+- Le statut (présent, vendu, mort, abattu, perdu) et le lot d'un animal sont DÉDUITS du dernier mouvement (`mvt_animal`) : jamais stockés. Supprimer un mouvement annule la sortie.
+- Mise bas prévue = dernière saillie + gestation (ovin 150 j, bovin 283 j, modifiable par saillie), annulée par une mise bas ou un diagnostic « vide ».
+- Délai d'attente : un soin (animal ou lot) avec `delaiAttente` jours bloque la vente et l'abattage jusqu'à `date + délai` (premier jour permis). Contrôle dans la vente (`Ventes.tsx`) et la sortie par abattage.
+- Vente d'animal : ligne `article: 'animal'` (`animalId`, au poids = kg × prix/kg, ou sur pied = 1 × prix) ; crée une sortie `mvt_animal` avec `venteId` ; supprimer la vente remet l'animal dans le registre.
+- Achat d'un animal : crée un `achat` (activité ovins/bovins) payé comptant. Coût d'un soin : crée une `depense` (`soinId`).
+- Embouche : GMQ = (dernier poids − premier poids) ÷ jours × 1000, coût de revient du kg vif = (achat + rations + soins) ÷ somme des derniers poids ; objectif de poids et de date (Tabaski) sur le lot.
+- Non fait : pâturage par parc, photos, traction et lait, proposition de réforme, mortalité avant sevrage.
+- Test de parcours : `npx wrangler dev --port 8791` puis `BASE=http://localhost:8791 node e2e/etape5.cjs`.
