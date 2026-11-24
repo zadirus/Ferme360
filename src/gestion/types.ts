@@ -61,6 +61,8 @@ export interface Article {
   categorie: 'aliment' | 'medicament' | 'autre';
   seuil: number; // alerte quand le stock descend à ce niveau
   kgParUnite: number; // aliment : 50 pour un sac de 50 kg, 1 si l'unité est le kg
+  stockMax?: number; // stock maximum souhaité (0 ou absent = pas de maximum)
+  delaiReappro?: number; // jours entre la commande et la livraison (0 ou absent = non renseigné)
   tags?: string[];
 }
 

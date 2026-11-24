@@ -11,7 +11,7 @@ import { newId, saveRecord } from '../sync';
 import { Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
 import { aTag, ChampEtiquettes, FiltreEtiquettes, Pastilles } from '../etiquettes';
 
-const TYPES_LOT: Array<[Lot['type'], string]> = [
+export const TYPES_LOT: Array<[Lot['type'], string]> = [
   ['troupeau', 'Troupeau'],
   ['embouche', 'Embouche (engraissement)'],
   ['reproductrices', 'Reproductrices'],

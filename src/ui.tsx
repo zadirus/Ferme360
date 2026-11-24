@@ -33,7 +33,7 @@ export function Champ({ label, value, onChange, type = 'text', required, min, ma
           min={min}
           max={max}
           placeholder={placeholder}
-          inputMode={type === 'number' ? 'numeric' : undefined}
+          inputMode={type === 'number' ? 'decimal' : undefined}
           step={type === 'number' ? 'any' : undefined}
         />
         {suffixe && <em>{suffixe}</em>}

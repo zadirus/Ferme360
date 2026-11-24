@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alertesArticle, coutMoyen, creances, detteFournisseur, lotsRestants, oeufsVendus, resultatsRepartis, soldesComptes, stockArticle, totalLignes } from './calculs';
+import { alertesArticle, coutMoyen, gestionStock, creances, detteFournisseur, lotsRestants, oeufsVendus, resultatsRepartis, soldesComptes, stockArticle, totalLignes } from './calculs';
 import type { Achat, Article, Depense, Paiement, StockMvt, Vente } from './types';
 
 const ligne = { article: 'oeufs' as const, libelle: '', quantite: 10, unite: 'plateau' as const, prixUnitaire: 2500 };
@@ -100,5 +100,55 @@ describe('charges communes réparties', () => {
     expect(r.nonReparti).toBe(40000);
     expect(r.lignes.every((l) => l.partCommun === 0)).toBe(true);
     expect(r.margeFerme).toBe(-40000);
+  });
+});
+
+describe('gestion des stocks : minimum, point de commande, maximum', () => {
+  const aliment: Article = { nom: 'Aliment ponte', unite: 'sac', categorie: 'aliment', seuil: 5, kgParUnite: 50, stockMax: 40, delaiReappro: 7 };
+  const auj = '2026-11-24';
+
+  it('consommation moyenne sur 30 jours et couverture en jours', () => {
+    // 30 sacs entrés le 1er novembre, 15 sortis (0,5 sac par jour sur 30 jours)
+    const g = gestionStock(aliment, [mvt('entree', 30, '', '2026-10-25'), mvt('sortie', 15, '', '2026-11-10')], auj);
+    expect(g.stock).toBe(15);
+    expect(g.consoJour).toBeCloseTo(0.5, 5);
+    expect(g.couvertureJours).toBeCloseTo(30, 5);
+  });
+
+  it('point de commande = minimum + consommation pendant le délai de livraison', () => {
+    const g = gestionStock(aliment, [mvt('entree', 30, '', '2026-10-25'), mvt('sortie', 15, '', '2026-11-10')], auj);
+    expect(g.pointCommande).toBeCloseTo(5 + 0.5 * 7, 5); // 8,5 sacs
+    expect(g.statut).toBe('ok');
+  });
+
+  it('sous le point de commande : à commander, quantité conseillée jusqu’au maximum', () => {
+    const g = gestionStock(aliment, [mvt('entree', 30, '', '2026-10-25'), mvt('sortie', 22, '', '2026-11-10')], auj); // reste 8
+    expect(g.statut).toBe('a_commander');
+    expect(g.aCommander).toBe(32); // 40 − 8
+    expect(alertesArticle(aliment, [mvt('entree', 30, '', '2026-10-25'), mvt('sortie', 22, '', '2026-11-10')], auj)[0]).toContain('à commander');
+  });
+
+  it('sous le minimum : stock bas ; à zéro : rupture', () => {
+    expect(gestionStock(aliment, [mvt('entree', 30), mvt('sortie', 26)], auj).statut).toBe('bas');
+    const rupture = gestionStock(aliment, [mvt('entree', 30), mvt('sortie', 30)], auj);
+    expect(rupture.statut).toBe('rupture');
+    expect(alertesArticle(aliment, [mvt('entree', 30), mvt('sortie', 30)], auj)[0]).toContain('rupture');
+  });
+
+  it('au-dessus du maximum : stock trop élevé', () => {
+    const g = gestionStock(aliment, [mvt('entree', 45)], auj);
+    expect(g.statut).toBe('surstock');
+  });
+
+  it('les demi-unités sont gérées (0,5 sac, 0,5 kg)', () => {
+    const g = gestionStock({ ...aliment, seuil: 1 }, [mvt('entree', 10), mvt('sortie', 9.5)], auj);
+    expect(g.stock).toBe(0.5);
+    expect(g.statut).toBe('bas');
+    expect(stockArticle([mvt('entree', 2.5), mvt('sortie', 0.5)])).toBe(2);
+  });
+
+  it('sans réglages, aucune alerte nouvelle : seuil seul', () => {
+    const simple: Article = { nom: 'X', unite: 'u', categorie: 'autre', seuil: 0, kgParUnite: 1 };
+    expect(gestionStock(simple, [mvt('entree', 3)], auj).statut).toBe('ok');
   });
 });

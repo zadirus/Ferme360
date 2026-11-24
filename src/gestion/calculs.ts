@@ -74,10 +74,49 @@ export function lotsRestants(mvts: StockMvt[]): Lot[] {
   return lots.filter((l) => l.restant > 1e-9);
 }
 
+// ---------- gestion des stocks (bonnes pratiques) ----------
+// Stock minimum (seuil) = stock de sécurité : en dessous, on risque la rupture.
+// Point de commande = stock minimum + consommation pendant le délai de livraison : à ce niveau, il faut commander.
+// Stock maximum = niveau à ne pas dépasser (argent immobilisé, péremption).
+
+export interface GestionStock {
+  stock: number;
+  consoJour: number; // consommation moyenne par jour sur les 30 derniers jours
+  couvertureJours: number | null; // jours restants au rythme actuel
+  pointCommande: number;
+  aCommander: number; // quantité conseillée pour revenir au stock cible (0 = rien à commander)
+  statut: 'rupture' | 'bas' | 'a_commander' | 'surstock' | 'ok';
+}
+
+export function gestionStock(a: Article, mvts: StockMvt[], aujourdhui: string, fenetre = 30): GestionStock {
+  const stock = stockArticle(mvts);
+  const sorties = mvts.filter((m) => m.type === 'sortie' && joursEntre(m.date, aujourdhui) <= fenetre && joursEntre(m.date, aujourdhui) >= 0);
+  const premiere = mvts.reduce((min, m) => (m.date < min ? m.date : min), aujourdhui);
+  const jours = Math.max(7, Math.min(fenetre, joursEntre(premiere, aujourdhui) + 1));
+  const consoJour = sorties.reduce((s, m) => s + m.quantite, 0) / jours;
+  const delai = a.delaiReappro && a.delaiReappro > 0 ? a.delaiReappro : 0;
+  const pointCommande = a.seuil + consoJour * delai;
+  const couvertureJours = consoJour > 0 ? stock / consoJour : null;
+  const max = a.stockMax && a.stockMax > 0 ? a.stockMax : 0;
+  let statut: GestionStock['statut'] = 'ok';
+  if (mvts.length > 0 && stock <= 0) statut = 'rupture';
+  else if (a.seuil > 0 && stock <= a.seuil) statut = 'bas';
+  else if (delai > 0 && stock <= pointCommande) statut = 'a_commander';
+  else if (max > 0 && stock > max) statut = 'surstock';
+  const cible = max > 0 ? max : pointCommande + consoJour * 30;
+  const brut = statut === 'rupture' || statut === 'bas' || statut === 'a_commander' ? Math.max(0, cible - stock) : 0;
+  const aCommander = Math.ceil(brut * 2) / 2; // arrondi au demi supérieur
+  return { stock, consoJour, couvertureJours, pointCommande, aCommander, statut };
+}
+
 export function alertesArticle(a: Article, mvts: StockMvt[], aujourdhui: string): string[] {
   const out: string[] = [];
   const stock = stockArticle(mvts);
-  if (a.seuil > 0 && stock <= a.seuil) out.push(`${a.nom} : stock bas (${stock} ${a.unite})`);
+  const g = gestionStock(a, mvts, aujourdhui);
+  if (g.statut === 'rupture') out.push(`${a.nom} : rupture de stock`);
+  else if (g.statut === 'bas') out.push(`${a.nom} : stock bas (${stock} ${a.unite}, minimum ${a.seuil})`);
+  else if (g.statut === 'a_commander') out.push(`${a.nom} : à commander (il en reste pour ${g.couvertureJours !== null ? Math.floor(g.couvertureJours) : '?'} jour(s), livraison en ${a.delaiReappro} j)`);
+  else if (g.statut === 'surstock') out.push(`${a.nom} : stock trop élevé (${stock} ${a.unite}, maximum ${a.stockMax})`);
   for (const l of lotsRestants(mvts)) {
     if (!l.peremption) continue;
     const j = joursEntre(aujourdhui, l.peremption);

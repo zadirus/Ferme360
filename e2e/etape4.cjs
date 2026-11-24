@@ -49,7 +49,7 @@ const futur = (j) => { const d = new Date(); d.setDate(d.getDate() + j); return 
   await tab('Stocks');
   await P.getByRole('button', { name: /Aliment$/ }).click();
   await P.getByLabel('Nom', { exact: true }).fill('Aliment ponte');
-  await P.getByLabel('Alerte quand il en reste').fill('5');
+  await P.getByLabel('Stock minimum (alerte)').fill('5');
   await envoyer("Créer l'article");
   await P.getByRole('button', { name: /Produit vétérinaire$/ }).click();
   await P.getByLabel('Catégorie').selectOption('medicament');

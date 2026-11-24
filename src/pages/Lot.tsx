@@ -1,6 +1,9 @@
 import { useState } from 'preact/hooks';
 import { dataOf, useItems, useRole } from '../hooks';
 import { EtiquettesFiche } from '../etiquettes';
+import { ActionsFiche } from '../ActionsFiche';
+import { nomDejaPris } from '../integrite';
+import { TYPES_LOT } from './Ruminants';
 import { peut, peutEcrire } from '../droits';
 import { fmtDate, fmtDec, fmtFcfa, fmtInt, joursEntre, today } from '../format';
 import { coutDistribution, coutMoyen } from '../gestion/calculs';
@@ -66,6 +69,15 @@ export function LotDetail({ id }: { id: string }) {
       <Retour vers={retour} texte="Registre" />
       <h2>{lot.nom}</h2>
       <EtiquettesFiche collection="lot" item={lot} />
+      <ActionsFiche collection="lot" item={lot} nom={lot.nom} retour={lot.espece === 'ovin' ? '/moutons' : '/boeufs'}
+        champs={[
+          { cle: 'nom', label: 'Nom du lot', type: 'texte', requis: true },
+          { cle: 'type', label: 'Type', type: 'choix', options: TYPES_LOT },
+          { cle: 'dateDebut', label: 'Date de début', type: 'date' },
+          { cle: 'poidsObjectif', label: 'Poids moyen visé', type: 'nombre', suffixe: 'kg' },
+          { cle: 'dateObjectif', label: 'Date visée (ex. Tabaski)', type: 'date' }
+        ]}
+        valider={(p, g, id) => (nomDejaPris(g, 'lot', 'nom', String(p.nom ?? ''), id, (x) => x.espece === lot.espece) ? 'Un autre lot porte déjà ce nom.' : null)} />
       <p class="intro">{lot.type === 'embouche' ? 'Lot d\'embouche' : lot.type === 'reproductrices' ? 'Reproductrices' : lot.type === 'troupeau' ? 'Troupeau' : 'Lot'} · début le {fmtDate(lot.dateDebut)}{lot.dateObjectif ? ` · objectif le ${fmtDate(lot.dateObjectif)}` : ''}</p>
       {objectif && <p class="succes">{objectif}</p>}
       <div class="stats">

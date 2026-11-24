@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { ActionsFiche } from '../ActionsFiche';
 import { dataOf, useItems } from '../hooks';
 import { fmtDate, fmtFcfa, today } from '../format';
 import { creances, detteFournisseur, resultatsRepartis, soldesComptes } from '../gestion/calculs';
@@ -94,6 +95,7 @@ export function Argent() {
               <li key={f.id}>
                 <div class="ligne"><strong>{f.nom}</strong><span class={`montant ${dette > 0 ? 'dette' : ''}`}>{dette > 0.5 ? fmtFcfa(dette) : 'À jour'}</span></div>
                 {f.telephone && <small>{f.telephone}</small>}
+                <ActionsFiche compact collection="fournisseur" item={f} nom={f.nom} retour="/argent" champs={[{ cle: 'nom', label: 'Nom', type: 'texte', requis: true }, { cle: 'telephone', label: 'Téléphone', type: 'texte' }]} />
                 {dette > 0.5 && <button type="button" class="lien" onClick={() => { setMode(null); setPayer(f.id); }}>Payer ce fournisseur</button>}
               </li>
             ))}

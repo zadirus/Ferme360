@@ -221,3 +221,9 @@ button.etiquette.propose.actif { background: var(--vert); color: #fff; border-st
 .ligne-etiquette input { flex: 1; min-width: 0; }
 .ligne-etiquette button { width: auto; flex: none; }
 .etiquettes.filtre { margin: 8px 0; }
+
+/* Modifier / supprimer une fiche */
+.actions-fiche { margin: 6px 0 10px; }
+.actions-fiche .ligne-actions { display: flex; gap: 18px; }
+.actions-fiche .lien.danger-lien { color: #a3281a; }
+.actions-fiche.compact { margin: 2px 0; }

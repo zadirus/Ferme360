@@ -1,5 +1,7 @@
 import { useState } from 'preact/hooks';
 import { EtiquettesFiche } from '../etiquettes';
+import { ActionsFiche } from '../ActionsFiche';
+import { nomDejaPris } from '../integrite';
 import { dataOf, useItems, useRole, type Item } from '../hooks';
 import { peut, peutEcrire } from '../droits';
 import { fmtDate, fmtDec, fmtFcfa, fmtInt, fmtPct, joursEntre, OEUFS_PAR_PLATEAU, today } from '../format';
@@ -125,6 +127,26 @@ export function BandeDetail({ id }: { id: string }) {
       <Retour vers="/poules" texte="Poules" />
       <h2>{b.nom}</h2>
       <EtiquettesFiche collection="bande" item={b} />
+      <ActionsFiche collection="bande" item={b} nom={b.nom} retour="/poules"
+        champs={[
+          { cle: 'nom', label: 'Nom de la bande', type: 'texte', requis: true },
+          { cle: 'batiment', label: 'Bâtiment', type: 'texte' },
+          { cle: 'souche', label: 'Souche', type: 'texte' },
+          { cle: 'origine', label: 'Origine', type: 'texte' },
+          { cle: 'effectifInitial', label: 'Poules à l’arrivée', type: 'nombre', entier: true, requis: true },
+          { cle: 'dateArrivee', label: 'Date d’arrivée', type: 'date', requis: true },
+          { cle: 'ageArriveeSemaines', label: 'Âge à l’arrivée', type: 'nombre', entier: true, suffixe: 'semaines' },
+          { cle: 'prixAchat', label: 'Prix d’achat des poules', type: 'nombre', suffixe: 'FCFA' }
+        ]}
+        valider={(p, g, id) => {
+          if (nomDejaPris(g, 'bande', 'nom', String(p.nom ?? ''), id)) return 'Une autre bande porte déjà ce nom.';
+          const effectif = Number(p.effectifInitial);
+          if (effectif <= 0) return 'Le nombre de poules doit être supérieur à 0.';
+          const morts = (g.mortalite ?? []).filter((m) => m.bandeId === id).reduce((s, m) => s + Number(m.nombre ?? 0), 0);
+          if (effectif < morts) return `Impossible : ${morts} poules sont déjà enregistrées comme mortes ou réformées dans cette bande.`;
+          if (String(p.dateArrivee) > today()) return 'La date d’arrivée ne peut pas être dans le futur.';
+          return null;
+        }} />
       <p class="intro">
         {[b.batiment, b.souche, `arrivée le ${fmtDate(b.dateArrivee)}`, `${ageSemaines} semaines`].filter(Boolean).join(' · ')}
         {b.cloturee && ` · clôturée le ${fmtDate(b.dateCloture ?? '')}`}

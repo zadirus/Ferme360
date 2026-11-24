@@ -15,6 +15,7 @@ import { construireRecu } from '../rapports/rapport';
 import { newId, saveRecord } from '../sync';
 import { Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
 import { go } from '../hooks';
+import { ActionsFiche } from '../ActionsFiche';
 import { aTag, EtiquettesFiche, FiltreEtiquettes, Pastilles } from '../etiquettes';
 
 const TYPES_CLIENT: Array<[Client['type'], string]> = [
@@ -335,6 +336,8 @@ export function ClientDetail({ id }: { id: string }) {
       <Retour vers="/clients" texte="Clients" />
       <h2>{c.nom}</h2>
       <EtiquettesFiche collection="client" item={c} />
+      <ActionsFiche collection="client" item={c} nom={c.nom} retour="/clients"
+        champs={[{ cle: 'nom', label: 'Nom', type: 'texte', requis: true }, { cle: 'telephone', label: 'Téléphone', type: 'texte' }, { cle: 'type', label: 'Type de client', type: 'choix', options: TYPES_CLIENT }]} />
       <p class="intro">{[TYPES_CLIENT.find(([k]) => k === c.type)?.[1], c.telephone].filter(Boolean).join(' · ')}</p>
       <div class="stats">
         <Stat valeur={fmtFcfa(du)} label={du > 0 ? `Doit${cr[0]?.jours ? ` · depuis ${cr[0].jours} j` : ''}` : 'Solde : à jour'} />

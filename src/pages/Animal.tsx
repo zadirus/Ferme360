@@ -15,6 +15,8 @@ import {
 import { gestationParDefaut } from '../reglages';
 import { newId, saveRecord } from '../sync';
 import { EtiquettesFiche } from '../etiquettes';
+import { ActionsFiche } from '../ActionsFiche';
+import { nomDejaPris } from '../integrite';
 import { Alertes, Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
 
 type Action = 'pesee' | 'soin' | 'repro' | 'misebas' | 'lot' | 'sortie' | 'traite' | 'travail';
@@ -82,6 +84,20 @@ export function AnimalDetail({ id }: { id: string }) {
       <Retour vers={retour} texte="Registre" />
       <h2>{ICONE_ESPECE[a.espece]} {libelleAnimal(a)}</h2>
       <EtiquettesFiche collection="animal" item={a} />
+      <ActionsFiche collection="animal" item={a} nom={libelleAnimal(a)} retour={retour}
+        champs={[
+          { cle: 'boucle', label: 'Numéro de boucle', type: 'texte', requis: true },
+          { cle: 'nom', label: 'Nom (facultatif)', type: 'texte' },
+          { cle: 'race', label: 'Race', type: 'texte' },
+          { cle: 'sexe', label: 'Sexe', type: 'choix', options: [['F', 'Femelle'], ['M', 'Mâle']], verrou: (g, i) => ['repro', 'misebas', 'traite'].some((c) => (g[c] ?? []).some((x) => x.femelleId === i || x.mereId === i || x.maleId === i || x.pereId === i || x.animalId === i)) || (g.animal ?? []).some((x) => x.mereId === i || x.pereId === i) ? 'des saillies, mises bas, traites ou descendants existent' : null },
+          { cle: 'naissance', label: 'Date de naissance', type: 'date' },
+          { cle: 'robe', label: 'Robe (couleur)', type: 'texte' }
+        ]}
+        valider={(p, g, i) => {
+          if (nomDejaPris(g, 'animal', 'boucle', String(p.boucle ?? ''), i, (x) => x.espece === a.espece)) return 'Ce numéro de boucle est déjà utilisé par un autre animal.';
+          if (p.naissance && String(p.naissance) > today()) return 'La date de naissance ne peut pas être dans le futur.';
+          return null;
+        }} />
       <p class="intro">
         {[a.sexe === 'F' ? 'Femelle' : 'Mâle', a.race, a.naissance ? `${a.naissanceEstimee ? '≈ ' : ''}${ageEnMois(a.naissance, today())} mois` : '', a.robe].filter(Boolean).join(' · ')}
         {!present && <> · <span class="badge rouge">{etat.statut} le {fmtDate(etat.dateSortie)}</span></>}
