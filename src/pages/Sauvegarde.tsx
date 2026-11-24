@@ -32,6 +32,7 @@ export function Sauvegarde() {
     const { octets, nom, n } = await contenu();
     if (partage) await partager(octets, nom, MIME_JSON, `Sauvegarde Ferme360 du ${fmtDate(today())}`);
     else telecharger(octets, nom, MIME_JSON);
+    localStorage.setItem('ferme360.sauvegarde', '1');
     setMessage(`Sauvegarde créée : ${n} enregistrements. Gardez ce fichier en lieu sûr (Google Drive, e-mail…).`);
   }
 

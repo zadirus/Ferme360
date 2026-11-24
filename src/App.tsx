@@ -8,6 +8,8 @@ import { appliquerReglages, ID_REGLAGES, type Reglages as TypeReglages } from '.
 import { Equipe, Journal, MotDePasse, Plus } from './pages/Admin';
 import { Rapports } from './pages/Rapports';
 import { Notifications } from './pages/Notifications';
+import { Aide } from './pages/Aide';
+import { Import } from './pages/Import';
 import { Pin } from './pages/Pin';
 import { pinDefini } from './pin';
 import { Verrou } from './Verrou';
@@ -41,7 +43,7 @@ function autorise(route: string, role: string): boolean {
   if (route.startsWith('/stocks')) return peut(role, 'stocks');
   if (route === '/rapports') return peut(role, 'rapports');
   if (route === '/reglages') return peut(role, 'reglages');
-  if (route === '/sauvegarde') return peut(role, 'sauvegarde');
+  if (route === '/sauvegarde' || route === '/import') return peut(role, 'sauvegarde');
   if (route === '/equipe') return peut(role, 'equipe');
   if (route === '/journal') return peut(role, 'journal');
   return true;
@@ -117,6 +119,8 @@ export function App() {
   else if (route === '/rapports') page = <Rapports />;
   else if (route === '/mdp') page = <MotDePasse />;
   else if (route === '/notifications') page = <Notifications />;
+  else if (route === '/aide') page = <Aide />;
+  else if (route === '/import') page = <Import />;
   else if (route === '/pin') page = <Pin />;
   else page = <Accueil />;
 

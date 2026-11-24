@@ -57,6 +57,19 @@ export async function saveRecord(collection: string, id: string, data: object, d
   scheduleSync();
 }
 
+// Enregistre beaucoup d'éléments d'un coup (reprise des données) : un seul rechargement des écrans à la fin
+export async function saveMany(items: Array<{ collection: string; id: string; data: object }>): Promise<void> {
+  const role = getUser()?.role ?? '';
+  const t = await now();
+  for (const it of items) {
+    if (!peutEcrire(role, it.collection)) throw new Error("Votre profil n'a pas le droit d'enregistrer ceci.");
+    await putRecord({ id: it.id, collection: it.collection, data: it.data as Record<string, unknown>, updatedAt: t, deleted: false, author: getUser()?.name ?? '', dirty: 1 });
+  }
+  await refreshPending();
+  await notifyData();
+  scheduleSync();
+}
+
 let timer: ReturnType<typeof setTimeout> | undefined;
 export function scheduleSync(delay = 400) {
   clearTimeout(timer);

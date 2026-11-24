@@ -11,6 +11,26 @@ import { miseBasPrevue } from '../ruminants/calculs';
 import { libelleAnimal, useRuminants } from '../ruminants/donnees';
 import { NOM_SOIN } from '../ruminants/types';
 import { Alertes } from '../ui';
+import { useEffect, useState } from 'preact/hooks';
+import { etatPush } from '../push';
+import { pinDefini } from '../pin';
+
+function PremiersPas({ ok }: { ok: Array<[string, string, boolean]> }) {
+  const [cache, setCache] = useState(() => localStorage.getItem('ferme360.premiers') === '1');
+  const reste = ok.filter(([, , f]) => !f).length;
+  if (cache || reste === 0) return null;
+  return (
+    <div class="premiers">
+      <h3>Premiers pas ({ok.length - reste}/{ok.length})</h3>
+      <ul>
+        {ok.map(([titre, lien, fait]) => (
+          <li key={titre} class={fait ? 'fait' : ''}><span>{fait ? '✅' : '⬜'}</span><a href={`#${lien}`}>{titre}</a></li>
+        ))}
+      </ul>
+      <button class="lien" type="button" onClick={() => { localStorage.setItem('ferme360.premiers', '1'); setCache(true); }}>Masquer cette liste</button>
+    </div>
+  );
+}
 
 export function Accueil() {
   const role = useRole();
@@ -31,6 +51,18 @@ export function Accueil() {
   const depenses = useItems<Depense>('depense');
   const ajustements = useItems<TresoMvt>('treso_mvt');
   const rum = useRuminants();
+
+  const [notifActives, setNotifActives] = useState(false);
+  useEffect(() => { void etatPush().then((e) => setNotifActives(e.abonne)).catch(() => undefined); }, []);
+  const premiersPas: Array<[string, string, boolean]> = [
+    ['Indiquer l’argent que vous avez en caisse', '/argent', ajustements.length > 0],
+    ['Ajouter vos poules, moutons ou bœufs (ou les importer)', '/import', bandes.length > 0 || rum.animaux.length > 0],
+    ['Ajouter vos aliments et médicaments en stock', '/stocks', articles.length > 0],
+    ['Créer les comptes de votre équipe', '/equipe', localStorage.getItem('ferme360.equipe') === '1'],
+    ['Activer les notifications du matin', '/notifications', notifActives],
+    ['Choisir un code PIN pour ce téléphone', '/pin', pinDefini()],
+    ['Faire une première sauvegarde', '/sauvegarde', localStorage.getItem('ferme360.sauvegarde') === '1']
+  ];
 
   const effectif = bandes.reduce((s, b) => s + effectifActuel(b, morts.filter((m) => m.bandeId === b.id)), 0);
   const stockO = stockOeufs(ram, mvts);
@@ -72,6 +104,7 @@ export function Accueil() {
         <strong>Bonjour{prenom ? `, ${prenom}` : ''}</strong>
         <span>{dateLongue}</span>
       </div>
+      {argent && <PremiersPas ok={premiersPas} />}
       <Alertes liste={toutes} />
       <ul class="tuiles">
         <li>

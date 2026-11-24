@@ -61,3 +61,9 @@ Avant de livrer : `npm run build` doit passer.
 - Service worker : `sw/sw.ts` (injectManifest : précache hors-ligne + `push` + `notificationclick`).
 - Code PIN local : `src/pin.ts`, `src/Verrou.tsx`, `src/pages/Pin.tsx` ; redemandé après 2 minutes hors de l'écran ; 5 erreurs = déconnexion.
 - Tests : `src/push/*.test.ts`, `src/alertes.test.ts`, `src/pin.test.ts` ; `e2e/push.cjs` (faux service de push qui déchiffre ; `wrangler dev --test-scheduled`, déclencheur `/cdn-cgi/handler/scheduled?cron=…`), `e2e/pin-hors-ligne.cjs`.
+
+## Mise en service : import, aide, premiers pas (étape 7, lot 2)
+- Import : `src/import/lecture.ts` (lecture .xlsx compressé et CSV, sans bibliothèque ; dates jj/mm/aaaa, aaaa-mm-jj ou numéro Excel), `src/import/modeles.ts` (contrôle ligne par ligne : animaux, clients avec solde, stock de départ, bandes), page `src/pages/Import.tsx` (modèle Excel à télécharger, aperçu, import des seules lignes valides). `saveMany` (sync.ts) enregistre en bloc.
+- La reprise ne crée JAMAIS de mouvement d'argent : prix d'achat gardé pour mémoire, solde client = `vente` avec `reprise: true` (comptée en créance, exclue des ventes et des résultats), stock de départ = entrée sans achat.
+- Aide : `src/pages/Aide.tsx` ; liste « Premiers pas » sur l'accueil (propriétaire et gérant) ; indicateurs mémorisés en localStorage (`ferme360.equipe`, `ferme360.sauvegarde`, `ferme360.premiers`).
+- Tests : `src/import/*.test.ts` (jsdom pour DOMParser ; fixture Excel réelle `src/import/fixtures/exemple.xlsx`), `e2e/import.cjs` (3 000 animaux : import 3 s, affichage < 1 s sur ordinateur).

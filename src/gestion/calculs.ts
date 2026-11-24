@@ -128,7 +128,7 @@ export interface Resultat {
 // Les achats sont comptés le jour de l'achat. Les charges communes ne sont pas encore réparties.
 export function resultats(ventes: Vente[], achats: Achat[], depenses: Depense[], activites: Activite[]): Resultat[] {
   return activites.map((activite) => {
-    const v = ventes.filter((x) => x.activite === activite).reduce((s, x) => s + x.total, 0);
+    const v = ventes.filter((x) => x.activite === activite && !x.reprise).reduce((s, x) => s + x.total, 0);
     const c =
       achats.filter((x) => x.activite === activite).reduce((s, x) => s + x.total, 0) +
       depenses.filter((x) => x.activite === activite).reduce((s, x) => s + x.montant, 0);

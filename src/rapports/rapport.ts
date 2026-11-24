@@ -48,7 +48,7 @@ export function construireRapport(mois: string, d: DonneesRapport, aujourdhui: s
   const dansLeMois = (date: string) => date >= debut && date <= fin;
   const clientNom = (id: string) => d.clients.find((c) => c.id === id)?.nom ?? 'Sans nom (comptant)';
 
-  const ventes = d.ventes.filter((v) => dansLeMois(v.date));
+  const ventes = d.ventes.filter((v) => dansLeMois(v.date) && !v.reprise);
   const achats = d.achats.filter((a) => dansLeMois(a.date));
   const depenses = d.depenses.filter((x) => dansLeMois(x.date));
 

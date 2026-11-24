@@ -30,7 +30,9 @@ export function Plus() {
         {peut(role, 'reglages') && lien('/reglages', '⚙️', 'Réglages', "Seuils d'alerte et valeurs par défaut")}
         {peut(role, 'equipe') && lien('/equipe', '👥', 'Équipe', 'Créer les comptes et choisir les droits')}
         {peut(role, 'journal') && lien('/journal', '🕑', 'Journal des modifications', 'Qui a modifié ou supprimé quoi')}
+        {peut(role, 'sauvegarde') && lien('/import', '📥', 'Reprendre mes données', 'Importer animaux, clients, stock, bandes depuis Excel')}
         {peut(role, 'sauvegarde') && lien('/sauvegarde', '💾', 'Sauvegarde', 'Exporter ou restaurer toutes les données')}
+        {lien('/aide', '❓', 'Aide', 'Mode d’emploi, par où commencer')}
         {lien('/notifications', '🔔', 'Notifications', 'Le résumé du matin sur ce téléphone')}
         {lien('/pin', '🔒', 'Code PIN', 'Verrouiller l’application sur ce téléphone')}
         {lien('/mdp', '🔑', 'Mon mot de passe', 'Le changer')}
@@ -96,7 +98,9 @@ export function Equipe() {
 
   const charger = async () => {
     try {
-      setComptes((await api<{ users: Compte[] }>('/api/users')).users);
+      const u = (await api<{ users: Compte[] }>('/api/users')).users;
+      if (u.length > 1) localStorage.setItem('ferme360.equipe', '1');
+      setComptes(u);
       setErreur('');
     } catch (e) {
       setErreur(e instanceof Error && e.message !== 'Failed to fetch' ? e.message : 'Cette page demande une connexion internet.');

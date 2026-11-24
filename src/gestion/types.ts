@@ -37,6 +37,7 @@ export interface Vente {
   lignes: LigneVente[];
   total: number;
   note: string;
+  reprise?: boolean; // solde de départ repris à la mise en service : une créance, pas une vente
 }
 
 export interface Paiement {
