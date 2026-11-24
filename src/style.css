@@ -10,3 +10,19 @@ h1 { margin: 0; font-size: 1.6rem; color: #2f6b3a; }
 ul { list-style: none; padding: 0; display: grid; gap: 12px; }
 li { background: #fff; border-radius: 12px; padding: 18px; display: grid; gap: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.08); min-height: 64px; }
 li span { color: #5d695d; font-size: .9rem; }
+h2 { font-size: 1.2rem; margin: 20px 0 4px; }
+.qui { color: #4b574b; font-size: .9rem; }
+.barre { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 12px 0; padding: 10px 12px; border-radius: 10px; font-size: .9rem; color: #fff; }
+.barre.ok { background: #2f6b3a; }
+.barre.attente { background: #8a6d1d; }
+.barre.hors { background: #b3541e; }
+.barre button { background: rgba(255,255,255,.2); color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: 8px; padding: 8px 10px; min-height: 40px; }
+form { display: grid; gap: 12px; margin: 12px 0; }
+label { display: grid; gap: 4px; font-size: .9rem; }
+input, textarea { font: inherit; padding: 12px; border: 1px solid #c9c4b3; border-radius: 10px; background: #fff; width: 100%; }
+button.principal { background: #2f6b3a; color: #fff; border: 0; border-radius: 12px; padding: 14px; font-size: 1rem; min-height: 48px; }
+button:disabled { opacity: .5; }
+button.lien { background: none; border: 0; color: #b3541e; text-align: left; padding: 4px 0; min-height: 36px; }
+.erreur { color: #b3261e; margin: 0; }
+li.vide { color: #5d695d; box-shadow: none; background: transparent; }
+li small { color: #5d695d; }
