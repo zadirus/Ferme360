@@ -19,6 +19,7 @@ export interface Client {
   nom: string;
   telephone: string;
   type: 'revendeur' | 'maquis' | 'particulier' | 'autre';
+  tags?: string[];
 }
 
 export interface LigneVente {
@@ -60,6 +61,7 @@ export interface Article {
   categorie: 'aliment' | 'medicament' | 'autre';
   seuil: number; // alerte quand le stock descend à ce niveau
   kgParUnite: number; // aliment : 50 pour un sac de 50 kg, 1 si l'unité est le kg
+  tags?: string[];
 }
 
 export interface Achat {

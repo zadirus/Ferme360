@@ -7,6 +7,7 @@ import type { Aliment, Bande, Fientes, Mortalite, Ramassage } from '../poules/ty
 import type { Vente } from '../gestion/types';
 import { newId, saveRecord } from '../sync';
 import { Alertes, Boutons, Champ, nombre, Retour } from '../ui';
+import { ChampEtiquettes, Pastilles } from '../etiquettes';
 
 export function Poules() {
   const bandes = useItems<Bande>('bande');
@@ -31,6 +32,7 @@ export function Poules() {
       <li key={b.id}>
         <a class="carte" href={`#/poules/${b.id}`}>
           <strong>{b.nom}</strong>
+          <Pastilles tags={b.tags} />
           <span>
             {fmtInt(i.effectif)} poules{b.batiment ? ` · ${b.batiment}` : ''}
           </span>
@@ -79,6 +81,7 @@ function BandeForm({ onFini }: { onFini: () => void }) {
   const [effectif, setEffectif] = useState('');
   const [origine, setOrigine] = useState('');
   const [prix, setPrix] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
 
   async function envoyer(e: Event) {
     e.preventDefault();
@@ -92,7 +95,8 @@ function BandeForm({ onFini }: { onFini: () => void }) {
       ageArriveeSemaines: Math.max(0, Math.floor(nombre(age))),
       effectifInitial: n,
       origine: origine.trim(),
-      prixAchat: Math.max(0, nombre(prix))
+      prixAchat: Math.max(0, nombre(prix)),
+      ...(tags.length ? { tags } : {})
     };
     await saveRecord('bande', newId(), data as unknown as Record<string, unknown>);
     onFini();
@@ -108,6 +112,7 @@ function BandeForm({ onFini }: { onFini: () => void }) {
       <Champ label="Bâtiment" value={batiment} onChange={setBatiment} placeholder="Ex. : Poulailler 1" />
       <Champ label="Souche" value={souche} onChange={setSouche} placeholder="Ex. : ISA Brown" />
       <Champ label="Origine" value={origine} onChange={setOrigine} placeholder="Ex. : couvoir, fournisseur" />
+      <ChampEtiquettes valeur={tags} onChange={setTags} />
       <Champ label="Prix d'achat total" type="number" min={0} value={prix} onChange={setPrix} suffixe="FCFA" />
       <Boutons onAnnuler={onFini} texte="Créer la bande" />
     </form>

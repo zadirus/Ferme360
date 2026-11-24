@@ -6,6 +6,7 @@ import { alertesArticle, coutMoyen, lotsRestants, stockArticle } from '../gestio
 import { ACTIVITES, COMPTES, type Achat, type Activite, type Article, type Compte, type Fournisseur, type StockMvt } from '../gestion/types';
 import { newId, saveRecord } from '../sync';
 import { Alertes, Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
+import { aTag, ChampEtiquettes, EtiquettesFiche, FiltreEtiquettes, Pastilles } from '../etiquettes';
 
 const CATEGORIES: Array<[Article['categorie'], string]> = [
   ['aliment', 'Aliment'],
@@ -23,6 +24,7 @@ export function Stocks() {
   const [mode, setMode] = useState<'article' | 'achat' | null>(null);
   const [categorieNouvelle, setCategorieNouvelle] = useState<Article['categorie']>('aliment');
   const [filtre, setFiltre] = useState<'tous' | Article['categorie']>('tous');
+  const [etiquette, setEtiquette] = useState('');
   const [message, setMessage] = useState('');
   const role = useRole();
   const argent = peut(role, 'argent');
@@ -47,6 +49,7 @@ export function Stocks() {
             {a.seuil > 0 ? ` · alerte à ${a.seuil}` : ''}
             {proche ? ` · périme le ${fmtDate(proche.peremption)}` : ''}
           </span>
+          <Pastilles tags={a.tags} />
           {al.length > 0 && <span class="alerte-mini">⚠ {al.length} alerte(s)</span>}
         </a>
       </li>
@@ -75,6 +78,7 @@ export function Stocks() {
       {mode === 'article' && <ArticleForm categorieInitiale={categorieNouvelle} onFini={fini} />}
       {mode === 'achat' && <AchatForm onFini={fini} />}
 
+      <FiltreEtiquettes presentes={articles.flatMap((a) => a.tags ?? [])} choisie={etiquette} onChange={setEtiquette} />
       <div class="puces">
         <button type="button" class={filtre === 'tous' ? 'actif' : ''} onClick={() => setFiltre('tous')}>Tous ({articles.length})</button>
         {categories.map((c) => <button key={c} type="button" class={filtre === c ? 'actif' : ''} onClick={() => setFiltre(c)}>{ICONE_CATEGORIE_ARTICLE[c]} {NOM_CATEGORIE_ARTICLE[c]} ({nb(c)})</button>)}
@@ -84,7 +88,7 @@ export function Stocks() {
         <div key={c}>
           <h3>{ICONE_CATEGORIE_ARTICLE[c]} {NOM_CATEGORIE_ARTICLE[c]}</h3>
           <ul>
-            {articles.filter((a) => a.categorie === c).sort((x, y) => x.nom.localeCompare(y.nom, 'fr')).map(carte)}
+            {articles.filter((a) => a.categorie === c && (!etiquette || aTag(a, etiquette))).sort((x, y) => x.nom.localeCompare(y.nom, 'fr')).map(carte)}
             {nb(c) === 0 && !mode && (
               <li class="vide">
                 {c === 'medicament' ? 'Aucun produit vétérinaire. Ajoutez vos vaccins et médicaments : leur stock baissera à chaque soin, et la péremption sera surveillée.' : c === 'aliment' ? 'Aucun aliment en stock.' : 'Aucun autre article.'}
@@ -103,10 +107,11 @@ function ArticleForm({ onFini, categorieInitiale = 'aliment' }: { onFini: (m: st
   const [categorie, setCategorie] = useState<Article['categorie']>(categorieInitiale);
   const [seuil, setSeuil] = useState('');
   const [kg, setKg] = useState('50');
+  const [tags, setTags] = useState<string[]>([]);
   async function envoyer(e: Event) {
     e.preventDefault();
     if (!nom.trim() || !unite.trim()) return;
-    await saveRecord('article', newId(), { nom: nom.trim(), unite: unite.trim(), categorie, seuil: nombre(seuil), kgParUnite: categorie === 'aliment' ? Math.max(0.001, nombre(kg)) : 1 } satisfies Article);
+    await saveRecord('article', newId(), { nom: nom.trim(), unite: unite.trim(), categorie, seuil: nombre(seuil), kgParUnite: categorie === 'aliment' ? Math.max(0.001, nombre(kg)) : 1, ...(tags.length ? { tags } : {}) } satisfies Article);
     onFini('Article créé');
   }
   return (
@@ -117,6 +122,7 @@ function ArticleForm({ onFini, categorieInitiale = 'aliment' }: { onFini: (m: st
       <Champ label="Unité de stock" value={unite} onChange={setUnite} required placeholder="sac, flacon, dose…" />
       {categorie === 'aliment' && <Champ label="Poids d'une unité" type="number" min={0} value={kg} onChange={setKg} suffixe="kg" />}
       <Champ label="Alerte quand il en reste" type="number" min={0} value={seuil} onChange={setSeuil} suffixe={unite} />
+      <ChampEtiquettes valeur={tags} onChange={setTags} />
       <Boutons texte="Créer l'article" onAnnuler={() => onFini('')} />
     </form>
   );
@@ -206,6 +212,7 @@ export function ArticleDetail({ id }: { id: string }) {
     <section>
       <Retour vers="/stocks" texte="Stocks" />
       <h2>{a.nom}</h2>
+      <EtiquettesFiche collection="article" item={a} />
       <Alertes liste={alertesArticle(a, mvts, today())} />
       <div class="stats">
         <Stat valeur={`${fmtDec(stock, stock % 1 ? 1 : 0)} ${a.unite}`} label="En stock" />

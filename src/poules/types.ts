@@ -9,6 +9,7 @@ export interface Bande {
   prixAchat: number;
   cloturee?: boolean;
   dateCloture?: string;
+  tags?: string[];
 }
 
 export interface Ramassage {
@@ -60,8 +61,9 @@ export interface Fientes {
 // Mouvement d'œufs hors ramassage : on ajoute, on ne modifie pas.
 export interface MvtOeufs {
   date: string;
-  type: 'vente' | 'consommation' | 'casse' | 'ajustement';
+  type: 'vente' | 'consommation' | 'casse' | 'ajustement' | 'achat'; // achat = œufs achetés à un fournisseur (entrée)
   quantite: number; // en œufs ; négatif possible pour un ajustement
   note: string;
   venteId?: string; // sortie créée par une vente
+  achatId?: string; // entrée créée par un achat d'œufs
 }

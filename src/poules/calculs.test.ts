@@ -23,6 +23,15 @@ describe('critères d’acceptation – poules', () => {
     expect(stockOeufs([ram('2026-11-02', 340)], mvts)).toBe(100);
   });
 
+  it('des œufs achetés à un fournisseur entrent dans le stock et peuvent être revendus', () => {
+    const mvts: MvtOeufs[] = [
+      { date: '2026-11-02', type: 'achat', quantite: 10 * 30, note: '', achatId: 'a1' },
+      { date: '2026-11-03', type: 'vente', quantite: 12 * 30, note: '' }
+    ];
+    // 340 ramassés + 300 achetés − 360 vendus = 280
+    expect(stockOeufs([ram('2026-11-02', 340)], mvts)).toBe(280);
+  });
+
   it('les fêlés et cassés comptent dans la ponte mais pas dans le stock vendable', () => {
     const r = [ram('2026-11-02', 300, 20, 10)];
     expect(tauxPonteJour(bande, r, [], '2026-11-02')!.toFixed(1)).toBe('82.5');

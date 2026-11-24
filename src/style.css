@@ -208,3 +208,16 @@ figure.courbe figcaption i { display: inline-block; width: 14px; height: 4px; bo
 .danger p { margin: 0; }
 button.alerte-btn { background: var(--terre); color: #fff; border: 0; border-radius: 14px; padding: 14px; min-height: 52px; font-size: 1rem; font-weight: 700; }
 button.alerte-btn:disabled { opacity: .4; }
+
+/* Étiquettes libres */
+.etiquettes { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+.etiquette { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; min-height: 0; border-radius: 999px; background: #e7efe2; color: var(--vert-fonce); font-size: .8rem; font-weight: 700; border: 1px solid #c9dbc1; width: auto; }
+.etiquette button { min-height: 0; width: auto; padding: 0 2px; background: none; border: none; color: inherit; font-size: 1rem; line-height: 1; }
+button.etiquette.propose { background: #fcfbf7; border: 1.5px dashed var(--vert); cursor: pointer; }
+button.etiquette.propose.actif { background: var(--vert); color: #fff; border-style: solid; }
+.champ-etiquettes { display: grid; gap: 6px; margin: 8px 0; }
+.champ-etiquettes .libelle { font-size: .88rem; font-weight: 600; color: var(--vert-fonce); }
+.ligne-etiquette { display: flex; gap: 8px; }
+.ligne-etiquette input { flex: 1; min-width: 0; }
+.ligne-etiquette button { width: auto; flex: none; }
+.etiquettes.filtre { margin: 8px 0; }

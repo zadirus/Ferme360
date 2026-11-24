@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { EtiquettesFiche } from '../etiquettes';
 import { dataOf, useItems, useRole, type Item } from '../hooks';
 import { peut, peutEcrire } from '../droits';
 import { fmtDate, fmtDec, fmtFcfa, fmtInt, fmtPct, joursEntre, OEUFS_PAR_PLATEAU, today } from '../format';
@@ -123,6 +124,7 @@ export function BandeDetail({ id }: { id: string }) {
     <section>
       <Retour vers="/poules" texte="Poules" />
       <h2>{b.nom}</h2>
+      <EtiquettesFiche collection="bande" item={b} />
       <p class="intro">
         {[b.batiment, b.souche, `arrivée le ${fmtDate(b.dateArrivee)}`, `${ageSemaines} semaines`].filter(Boolean).join(' · ')}
         {b.cloturee && ` · clôturée le ${fmtDate(b.dateCloture ?? '')}`}

@@ -9,6 +9,7 @@ import { libelleAnimal, useRuminants } from '../ruminants/donnees';
 import { ACTIVITE_ESPECE, ICONE_ESPECE, NOM_ESPECE, NOM_ESPECES, RACES, type Animal, type Espece, type Lot, type MvtAnimal, type Pesee } from '../ruminants/types';
 import { newId, saveRecord } from '../sync';
 import { Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
+import { aTag, ChampEtiquettes, FiltreEtiquettes, Pastilles } from '../etiquettes';
 
 const TYPES_LOT: Array<[Lot['type'], string]> = [
   ['troupeau', 'Troupeau'],
@@ -22,12 +23,13 @@ export function Ruminants({ espece }: { espece: Espece }) {
   const [mode, setMode] = useState<'animal' | 'lot' | null>(null);
   const [recherche, setRecherche] = useState('');
   const [sortis, setSortis] = useState(false);
+  const [etiquette, setEtiquette] = useState('');
   const [message, setMessage] = useState('');
   const role = useRole();
 
   const tous = r.animaux.filter((a) => a.espece === espece);
   const presents = tous.filter((a) => r.statut(a.id) === 'present');
-  const filtre = (a: Animal) => !recherche.trim() || `${a.boucle} ${a.nom}`.toLowerCase().includes(recherche.trim().toLowerCase());
+  const filtre = (a: Animal) => (!recherche.trim() || `${a.boucle} ${a.nom}`.toLowerCase().includes(recherche.trim().toLowerCase())) && (!etiquette || aTag(a, etiquette));
   const liste = (sortis ? tous.filter((a) => r.statut(a.id) !== 'present') : presents).filter(filtre).sort((a, b) => a.boucle.localeCompare(b.boucle, 'fr', { numeric: true }));
   const lots = r.lots.filter((l) => l.espece === espece);
   const femelles = presents.filter((a) => a.sexe === 'F').length;
@@ -93,6 +95,7 @@ export function Ruminants({ espece }: { espece: Espece }) {
                   <a class="carte" href={`#/lots/${l.id}`}>
                     <strong>{l.nom}</strong>
                     <span>{TYPES_LOT.find(([k]) => k === l.type)?.[1]} · {n} animal(aux)</span>
+                    <Pastilles tags={l.tags} />
                   </a>
                 </li>
               );
@@ -103,6 +106,7 @@ export function Ruminants({ espece }: { espece: Espece }) {
 
       <h3>{sortis ? 'Animaux sortis' : 'Registre'}</h3>
       <input type="search" placeholder="Chercher un numéro de boucle ou un nom" value={recherche} onInput={(e) => setRecherche(e.currentTarget.value)} />
+      <FiltreEtiquettes presentes={tous.flatMap((a) => a.tags ?? [])} choisie={etiquette} onChange={setEtiquette} />
       <ul>
         {liste.map((a) => {
           const e = r.etat(a.id);
@@ -114,6 +118,7 @@ export function Ruminants({ espece }: { espece: Espece }) {
                 <span>
                   {[a.sexe === 'F' ? 'Femelle' : 'Mâle', a.race, a.naissance ? `${ageEnMois(a.naissance, today())} mois` : '', p ? `${fmtDec(p, 0)} kg` : '', nomLot(e.lotId)].filter(Boolean).join(' · ')}
                 </span>
+                <Pastilles tags={a.tags} />
                 {e.statut !== 'present' && <span class="alerte-mini">{e.statut} le {fmtDate(e.dateSortie)}</span>}
               </a>
             </li>
@@ -136,6 +141,7 @@ function AnimalForm({ espece, onFini }: { espece: Espece; onFini: (m: string) =>
   const [naissance, setNaissance] = useState('');
   const [ageMois, setAgeMois] = useState('');
   const [robe, setRobe] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [origine, setOrigine] = useState<'ne' | 'achete'>('ne');
   const [mereId, setMereId] = useState('');
   const [pereId, setPereId] = useState('');
@@ -171,7 +177,7 @@ function AnimalForm({ espece, onFini }: { espece: Espece; onFini: (m: string) =>
     await saveRecord('animal', id, {
       boucle: b, nom: nom.trim(), espece, race, sexe, naissance: dateNaiss, naissanceEstimee: estimee, robe: robe.trim(), origine,
       mereId: achete ? '' : mereId, pereId: achete ? '' : pereId, miseBasId: '', vendeur: achete ? vendeur.trim() : '',
-      prixAchat, poidsAchat: achete ? nombre(poids) : 0, dateAchat: achete ? dateAchat : ''
+      prixAchat, poidsAchat: achete ? nombre(poids) : 0, dateAchat: achete ? dateAchat : '', ...(tags.length ? { tags } : {})
     } satisfies Animal);
     await saveRecord('mvt_animal', newId(), { animalId: id, date: dateEntree, type: 'entree', motif: achete ? 'achat' : 'naissance', lotId, venteId: '', note: '' } satisfies MvtAnimal);
     if (nombre(poids) > 0) await saveRecord('pesee', newId(), { animalId: id, date: dateEntree, poids: nombre(poids), methode: 'balance' } satisfies Pesee);
@@ -207,6 +213,7 @@ function AnimalForm({ espece, onFini }: { espece: Espece; onFini: (m: string) =>
       )}
       <Champ label={origine === 'achete' ? "Poids à l'achat (facultatif)" : 'Poids actuel (facultatif)'} type="number" min={0} value={poids} onChange={setPoids} suffixe="kg" />
       <Choix label="Lot" value={lotId} onChange={setLotId} options={[['', 'Aucun lot'], ...lots.map((l) => [l.id, l.nom] as [string, string])]} />
+      <ChampEtiquettes valeur={tags} onChange={setTags} />
       {erreur && <p class="erreur">{erreur}</p>}
       <Boutons texte="Ajouter l'animal" onAnnuler={() => onFini('')} />
     </form>
@@ -219,11 +226,12 @@ function LotForm({ espece, onFini }: { espece: Espece; onFini: (m: string) => vo
   const [debut, setDebut] = useState(today());
   const [objPoids, setObjPoids] = useState('');
   const [objDate, setObjDate] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   async function envoyer(e: Event) {
     e.preventDefault();
     if (!nom.trim()) return;
     const id = newId();
-    await saveRecord('lot', id, { nom: nom.trim(), type, espece, dateDebut: debut, poidsObjectif: type === 'embouche' ? nombre(objPoids) : 0, dateObjectif: type === 'embouche' ? objDate : '' } satisfies Lot);
+    await saveRecord('lot', id, { nom: nom.trim(), type, espece, dateDebut: debut, poidsObjectif: type === 'embouche' ? nombre(objPoids) : 0, dateObjectif: type === 'embouche' ? objDate : '', ...(tags.length ? { tags } : {}) } satisfies Lot);
     onFini('Lot créé');
     go(`/lots/${id}`);
   }
@@ -239,6 +247,7 @@ function LotForm({ espece, onFini }: { espece: Espece; onFini: (m: string) => vo
           <Champ label="Date visée, par exemple la Tabaski (facultatif)" type="date" value={objDate} onChange={setObjDate} />
         </>
       )}
+      <ChampEtiquettes valeur={tags} onChange={setTags} />
       <Boutons texte="Créer le lot" onAnnuler={() => onFini('')} />
     </form>
   );

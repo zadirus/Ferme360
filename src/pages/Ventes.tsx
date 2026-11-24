@@ -15,6 +15,7 @@ import { construireRecu } from '../rapports/rapport';
 import { newId, saveRecord } from '../sync';
 import { Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
 import { go } from '../hooks';
+import { aTag, EtiquettesFiche, FiltreEtiquettes, Pastilles } from '../etiquettes';
 
 const TYPES_CLIENT: Array<[Client['type'], string]> = [
   ['revendeur', 'Revendeur'],
@@ -262,20 +263,23 @@ export function Clients() {
   const paiements = useItems<Paiement>('paiement');
   const cr = creances(ventes, paiements, today());
   const solde = (id: string) => cr.find((c) => c.clientId === id);
+  const [etiquette, setEtiquette] = useState('');
   const tri = [...clients].sort((a, b) => (solde(b.id)?.solde ?? 0) - (solde(a.id)?.solde ?? 0) || a.nom.localeCompare(b.nom));
 
   return (
     <section>
       <Retour vers="/ventes" texte="Ventes" />
       <h2>Clients</h2>
+      <FiltreEtiquettes presentes={clients.flatMap((c) => c.tags ?? [])} choisie={etiquette} onChange={setEtiquette} />
       <ul>
-        {tri.map((c) => {
+        {tri.filter((c) => !etiquette || aTag(c, etiquette)).map((c) => {
           const s = solde(c.id);
           return (
             <li key={c.id}>
               <a class="carte" href={`#/clients/${c.id}`}>
                 <strong>{c.nom}</strong>
                 <span>{[TYPES_CLIENT.find(([k]) => k === c.type)?.[1], c.telephone].filter(Boolean).join(' · ')}</span>
+                <Pastilles tags={c.tags} />
                 {s ? <span class="dette">Doit {fmtFcfa(s.solde)}{s.jours > 0 ? ` depuis ${s.jours} j` : ''}</span> : <span>À jour</span>}
               </a>
             </li>
@@ -330,6 +334,7 @@ export function ClientDetail({ id }: { id: string }) {
     <section>
       <Retour vers="/clients" texte="Clients" />
       <h2>{c.nom}</h2>
+      <EtiquettesFiche collection="client" item={c} />
       <p class="intro">{[TYPES_CLIENT.find(([k]) => k === c.type)?.[1], c.telephone].filter(Boolean).join(' · ')}</p>
       <div class="stats">
         <Stat valeur={fmtFcfa(du)} label={du > 0 ? `Doit${cr[0]?.jours ? ` · depuis ${cr[0].jours} j` : ''}` : 'Solde : à jour'} />

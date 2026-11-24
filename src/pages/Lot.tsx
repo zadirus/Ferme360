@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import { dataOf, useItems, useRole } from '../hooks';
+import { EtiquettesFiche } from '../etiquettes';
 import { peut, peutEcrire } from '../droits';
 import { fmtDate, fmtDec, fmtFcfa, fmtInt, joursEntre, today } from '../format';
 import { coutDistribution, coutMoyen } from '../gestion/calculs';
@@ -64,6 +65,7 @@ export function LotDetail({ id }: { id: string }) {
     <section>
       <Retour vers={retour} texte="Registre" />
       <h2>{lot.nom}</h2>
+      <EtiquettesFiche collection="lot" item={lot} />
       <p class="intro">{lot.type === 'embouche' ? 'Lot d\'embouche' : lot.type === 'reproductrices' ? 'Reproductrices' : lot.type === 'troupeau' ? 'Troupeau' : 'Lot'} · début le {fmtDate(lot.dateDebut)}{lot.dateObjectif ? ` · objectif le ${fmtDate(lot.dateObjectif)}` : ''}</p>
       {objectif && <p class="succes">{objectif}</p>}
       <div class="stats">

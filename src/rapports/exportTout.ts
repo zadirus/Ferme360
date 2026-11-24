@@ -32,6 +32,7 @@ export function feuillesDonnees(records: Enregistrement[]): Feuille[] {
         if (typeof v === 'number') return v;
         if (typeof v === 'boolean') return v ? 'oui' : 'non';
         if (v === undefined || v === null) return '';
+        if (Array.isArray(v) && v.every((x) => typeof x === 'string')) return v.join(', ');
         if (typeof v === 'object') return JSON.stringify(v);
         return String(v);
       }),

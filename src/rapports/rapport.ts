@@ -79,6 +79,7 @@ export function construireRapport(mois: string, d: DonneesRapport, aujourdhui: s
     }
   }
   const morts = d.mortalites.filter((m) => dansLeMois(m.date));
+  const achetes = d.mvtsOeufs.filter((m) => dansLeMois(m.date) && m.type === 'achat').reduce((s, m) => s + m.quantite, 0);
   const vendus = d.mvtsOeufs.filter((m) => dansLeMois(m.date) && m.type === 'vente').reduce((s, m) => s + m.quantite, 0);
   const autres = d.mvtsOeufs.filter((m) => dansLeMois(m.date) && (m.type === 'consommation' || m.type === 'casse')).reduce((s, m) => s + m.quantite, 0);
   const stockFin = stockOeufs(d.ramassages.filter((r) => r.date <= fin), d.mvtsOeufs.filter((m) => m.date <= fin));
@@ -90,6 +91,7 @@ export function construireRapport(mois: string, d: DonneesRapport, aujourdhui: s
       ['Taux de ponte moyen', taux.length ? `${fmtDec(taux.reduce((a, b) => a + b, 0) / taux.length)} %` : 'pas de ramassage'],
       ['Poules mortes', fmtInt(morts.filter((m) => m.type === 'mort').reduce((s, m) => s + m.nombre, 0))],
       ['Poules réformées', fmtInt(morts.filter((m) => m.type === 'reforme').reduce((s, m) => s + m.nombre, 0))],
+      ...(achetes > 0 ? [['Œufs achetés à des fournisseurs', `${fmtInt(achetes)} (${fmtDec(achetes / OEUFS_PAR_PLATEAU)} plateaux)`]] : []),
       ['Œufs vendus', `${fmtInt(vendus)} (${fmtDec(vendus / OEUFS_PAR_PLATEAU)} plateaux)`],
       ['Œufs consommés ou cassés au stockage', fmtInt(autres)],
       ['Stock d’œufs en fin de mois', `${fmtInt(stockFin)} (${fmtDec(stockFin / OEUFS_PAR_PLATEAU)} plateaux)`]

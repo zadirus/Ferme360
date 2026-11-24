@@ -14,6 +14,7 @@ import {
 } from '../ruminants/types';
 import { gestationParDefaut } from '../reglages';
 import { newId, saveRecord } from '../sync';
+import { EtiquettesFiche } from '../etiquettes';
 import { Alertes, Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
 
 type Action = 'pesee' | 'soin' | 'repro' | 'misebas' | 'lot' | 'sortie' | 'traite' | 'travail';
@@ -80,6 +81,7 @@ export function AnimalDetail({ id }: { id: string }) {
     <section>
       <Retour vers={retour} texte="Registre" />
       <h2>{ICONE_ESPECE[a.espece]} {libelleAnimal(a)}</h2>
+      <EtiquettesFiche collection="animal" item={a} />
       <p class="intro">
         {[a.sexe === 'F' ? 'Femelle' : 'Mâle', a.race, a.naissance ? `${a.naissanceEstimee ? '≈ ' : ''}${ageEnMois(a.naissance, today())} mois` : '', a.robe].filter(Boolean).join(' · ')}
         {!present && <> · <span class="badge rouge">{etat.statut} le {fmtDate(etat.dateSortie)}</span></>}

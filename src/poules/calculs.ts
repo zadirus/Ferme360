@@ -27,10 +27,10 @@ export function datesRamassage(ramassages: Ramassage[]): string[] {
   return [...new Set(ramassages.map((r) => r.date))].sort();
 }
 
-// Stock d'œufs : bons œufs ramassés − ventes, consommation, casse (+ ajustements d'inventaire)
+// Stock d'œufs : bons œufs ramassés + œufs achetés − ventes, consommation, casse (+ ajustements d'inventaire)
 export function stockOeufs(ramassages: Ramassage[], mvts: MvtOeufs[]): number {
   const entrees = ramassages.reduce((s, r) => s + r.bons, 0);
-  const sorties = mvts.reduce((s, m) => (m.type === 'ajustement' ? s + m.quantite : s - m.quantite), 0);
+  const sorties = mvts.reduce((s, m) => (m.type === 'ajustement' || m.type === 'achat' ? s + m.quantite : s - m.quantite), 0);
   return entrees + sorties;
 }
 

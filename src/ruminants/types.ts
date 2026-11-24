@@ -27,6 +27,7 @@ export interface Animal {
   prixAchat: number;
   poidsAchat: number;
   dateAchat: string;
+  tags?: string[];
 }
 
 // Mouvements : le statut et le lot d'un animal sont toujours déduits d'eux.
@@ -47,6 +48,7 @@ export interface Lot {
   dateDebut: string;
   poidsObjectif: number; // embouche : poids moyen visé (kg), 0 si aucun
   dateObjectif: string; // embouche : date visée (ex. Tabaski)
+  tags?: string[];
 }
 
 export interface Pesee {
