@@ -1,5 +1,5 @@
 // Synchronisation : envoie les saisies en attente, récupère celles des autres téléphones.
-import { countDirty, dirtyRecords, getMeta, getRecord, purgerSauf, putRecord, setMeta, type Rec } from './db';
+import { countDirty, dirtyRecords, getMeta, getRecord, purgerSauf, putRecord, reinitialiserDonnees, setMeta, type Rec } from './db';
 import { peutEcrire, peutLire } from './droits';
 import { ApiError, api, clearToken, getToken, getUser, saveUser } from './session';
 
@@ -83,6 +83,8 @@ interface SyncResponse {
   records: Array<Omit<Rec, 'dirty'>>;
   rejected?: string[];
   user?: { name: string; role: string };
+  resetRequired?: boolean;
+  epoch?: string;
 }
 
 export async function syncNow(): Promise<void> {
@@ -95,6 +97,7 @@ export async function syncNow(): Promise<void> {
       const pushed = await dirtyRecords(100);
       const res = await api<SyncResponse>('/api/sync', {
         since,
+        epoch: (await getMeta<string>('epoch')) ?? '',
         changes: pushed.map((r) => ({
           id: r.id,
           collection: r.collection,
@@ -103,6 +106,15 @@ export async function syncNow(): Promise<void> {
           deleted: r.deleted
         }))
       });
+      if (res.resetRequired) {
+        // la ferme a été remise à zéro : les données de ce téléphone appartiennent à l'ancienne époque
+        await reinitialiserDonnees(res.epoch ?? '0');
+        await refreshPending();
+        await notifyData();
+        more = true;
+        continue;
+      }
+      if (res.epoch !== undefined && (await getMeta<string>('epoch')) === undefined) await setMeta('epoch', res.epoch);
       await setMeta('clockOffset', res.serverTime - Date.now());
       // le profil peut avoir été modifié par le propriétaire
       if (res.user) {

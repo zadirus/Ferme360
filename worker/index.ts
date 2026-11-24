@@ -284,6 +284,10 @@ const NEXT_SEQ = `(SELECT COALESCE(MAX(seq),0)+1 FROM records)`;
 async function sync(req: Request, env: Env, session: Session): Promise<Response> {
   const b = await readBody(req);
   if (!b) return fail(400, 'Requête invalide.');
+  // « époque » : change à chaque remise à zéro. Un téléphone qui garde l'ancienne époque doit vider ses données avant de continuer.
+  const epoque = (await reglage(env.DB, 'epoch')) ?? '0';
+  const epoqueClient = typeof b.epoch === 'string' && b.epoch ? b.epoch : '0';
+  if (epoqueClient !== epoque) return json({ resetRequired: true, epoch: epoque, serverTime: Date.now() });
   const since = Number.isInteger(b.since) ? (b.since as number) : 0;
   const changes = Array.isArray(b.changes) ? b.changes : [];
   if (changes.length > MAX_CHANGES) return fail(413, 'Trop de modifications à la fois.');
@@ -350,6 +354,7 @@ async function sync(req: Request, env: Env, session: Session): Promise<Response>
   const more = rows.results.length > PAGE_SIZE;
   return json({
     serverTime: Date.now(),
+    epoch: epoque,
     seq: page.length ? page[page.length - 1].seq : since,
     more,
     rejected,
@@ -411,6 +416,21 @@ async function modifierCompte(req: Request, env: Env, session: Session): Promise
     await env.DB.prepare(`UPDATE users SET salt=?, hash=? WHERE id=?`).bind(salt, await hashPassword(b.password, salt), id).run();
   }
   return json({ ok: true });
+}
+
+// Remise à zéro (propriétaire) : efface les données de la ferme, garde les comptes de l'équipe.
+async function remiseAZero(req: Request, env: Env): Promise<Response> {
+  const b = await readBody(req);
+  if (b?.confirmation !== 'REMETTRE A ZERO') return fail(400, 'Confirmation incorrecte.');
+  const garderReglages = b?.garderReglages !== false;
+  const epoch = randomHex(8);
+  await env.DB.batch([
+    garderReglages ? env.DB.prepare(`DELETE FROM records WHERE collection <> 'reglage'`) : env.DB.prepare(`DELETE FROM records`),
+    env.DB.prepare(`DELETE FROM journal`),
+    env.DB.prepare(`DELETE FROM settings WHERE key='resume_envoye'`),
+    env.DB.prepare(`INSERT INTO settings(key,value) VALUES ('epoch', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).bind(epoch)
+  ]);
+  return json({ epoch });
 }
 
 async function changerMotDePasse(req: Request, env: Env, session: Session): Promise<Response> {
@@ -602,12 +622,13 @@ export default {
         const r = await routePush(req, url, env, session);
         if (r) return r;
       }
-      if (url.pathname === '/api/users' || url.pathname === '/api/users/update' || url.pathname === '/api/journal') {
+      if (url.pathname === '/api/users' || url.pathname === '/api/users/update' || url.pathname === '/api/journal' || url.pathname === '/api/reset') {
         if (session.role !== 'owner') return fail(403, 'Réservé au propriétaire.');
         if (route === 'GET /api/users') return await listeComptes(env);
         if (route === 'POST /api/users') return await creerCompte(req, env);
         if (route === 'POST /api/users/update') return await modifierCompte(req, env, session);
         if (route === 'GET /api/journal') return await journal(url, env);
+        if (route === 'POST /api/reset') return await remiseAZero(req, env);
       }
       return fail(404, 'Introuvable.');
     } catch (e) {

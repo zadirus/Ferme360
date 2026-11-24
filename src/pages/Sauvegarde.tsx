@@ -1,8 +1,12 @@
 import { useState } from 'preact/hooks';
-import { exporterTout, getRecord, putRecord } from '../db';
-import { peutEcrire } from '../droits';
+import { exporterTout, getRecord, putRecord, reinitialiserDonnees } from '../db';
+import { peut, peutEcrire } from '../droits';
+import { useRole } from '../hooks';
+import { construireXlsx } from '../rapports/xlsx';
+import { feuillesDonnees } from '../rapports/exportTout';
+import { api } from '../session';
 import { fmtDate, today } from '../format';
-import { MIME_JSON, partager, telecharger } from '../partage';
+import { MIME_JSON, MIME_XLSX, partager, telecharger } from '../partage';
 import { getUser } from '../session';
 import { notifyData, refreshPending, syncNow } from '../sync';
 import { Retour } from '../ui';
@@ -14,7 +18,44 @@ interface Fichier {
   records: Array<{ id: string; collection: string; data: Record<string, unknown>; updatedAt: number; author?: string }>;
 }
 
+function RemiseAZero() {
+  const [garder, setGarder] = useState(true);
+  const [texte, setTexte] = useState('');
+  const [erreur, setErreur] = useState('');
+  const [fait, setFait] = useState(false);
+  async function lancer() {
+    setErreur('');
+    if (!window.confirm("DERNIÈRE QUESTION : toutes les données de la ferme vont être effacées sur le serveur et sur tous les téléphones. Avez-vous exporté une sauvegarde ?")) return;
+    try {
+      const r = await api<{ epoch: string }>('/api/reset', { confirmation: 'REMETTRE A ZERO', garderReglages: garder });
+      await reinitialiserDonnees(r.epoch);
+      for (const k of ['ferme360.premiers', 'ferme360.sauvegarde', 'ferme360.equipe']) localStorage.removeItem(k);
+      await notifyData();
+      void syncNow();
+      setFait(true);
+      setTexte('');
+    } catch (e) {
+      setErreur(e instanceof Error && e.message !== 'Failed to fetch' ? e.message : 'Il faut une connexion internet pour remettre la ferme à zéro.');
+    }
+  }
+  return (
+    <>
+      <h3>Remettre la ferme à zéro</h3>
+      <div class="danger">
+        <p>Efface <strong>toutes les données</strong> : animaux, bandes, ventes, clients, stocks, argent, notes, journal. Sur le serveur <strong>et sur tous les téléphones</strong> (chacun se vide à sa prochaine connexion). Les comptes de l'équipe sont conservés.</p>
+        <p>À utiliser pour repartir de zéro après vos essais. <strong>Exportez d'abord une sauvegarde ci-dessus.</strong> Cloudflare garde en plus l'historique de la base pendant 7 jours (30 en formule payante) : en cas d'erreur, on peut encore revenir en arrière.</p>
+        <label class="case"><input type="checkbox" checked={garder} onChange={() => setGarder(!garder)} />Garder mes réglages (seuils, programme de vaccination, courbe de ponte)</label>
+        <label>Pour confirmer, tapez : REMETTRE A ZERO<input value={texte} onInput={(e) => setTexte(e.currentTarget.value)} autocomplete="off" autocapitalize="characters" /></label>
+        {erreur && <p class="erreur">{erreur}</p>}
+        {fait && <p class="succes" role="status">La ferme est remise à zéro. Vous pouvez saisir vos vraies données.</p>}
+        <button type="button" class="alerte-btn" disabled={texte.trim().toUpperCase() !== 'REMETTRE A ZERO'} onClick={() => void lancer()}>Effacer toutes les données</button>
+      </div>
+    </>
+  );
+}
+
 export function Sauvegarde() {
+  const role = useRole();
   const [message, setMessage] = useState('');
   const [erreur, setErreur] = useState('');
 
@@ -34,6 +75,16 @@ export function Sauvegarde() {
     else telecharger(octets, nom, MIME_JSON);
     localStorage.setItem('ferme360.sauvegarde', '1');
     setMessage(`Sauvegarde créée : ${n} enregistrements. Gardez ce fichier en lieu sûr (Google Drive, e-mail…).`);
+  }
+
+  async function excel(partage: boolean) {
+    setErreur('');
+    const recs = await exporterTout();
+    const octets = construireXlsx(feuillesDonnees(recs.map((r) => ({ id: r.id, collection: r.collection, data: r.data, updatedAt: r.updatedAt, author: r.author }))));
+    const nom = `ferme360-donnees-${today()}.xlsx`;
+    if (partage) await partager(octets, nom, MIME_XLSX, `Données Ferme360 du ${fmtDate(today())}`);
+    else telecharger(octets, nom, MIME_XLSX);
+    setMessage(`Fichier Excel créé : ${recs.length} enregistrements, une feuille par type de données.`);
   }
 
   async function restaurer(e: Event) {
@@ -84,12 +135,19 @@ export function Sauvegarde() {
         <button class="principal" type="button" onClick={() => void exporter(true)}><span class="e">📤</span>Partager la sauvegarde</button>
         <button class="secondaire" type="button" onClick={() => void exporter(false)}>Télécharger le fichier</button>
       </div>
+      <h3>Consulter toutes mes données dans Excel</h3>
+      <p class="intro">Un seul fichier Excel avec une feuille par type de données (animaux, ventes, clients, stocks…), noms à la place des codes. Pour lire, trier ou filtrer comme vous voulez.</p>
+      <div class="actions">
+        <button class="principal" type="button" onClick={() => void excel(true)}><span class="e">📗</span>Partager en Excel</button>
+        <button class="secondaire" type="button" onClick={() => void excel(false)}>Télécharger l'Excel</button>
+      </div>
       <h3>Restaurer</h3>
       <p class="intro">Choisissez un fichier de sauvegarde. Rien n'est effacé : les enregistrements manquants sont remis, et ce qui a été modifié depuis la sauvegarde est conservé.</p>
       <label class="fichier">
         Choisir un fichier de sauvegarde
         <input type="file" accept=".json,application/json" onChange={(e) => void restaurer(e)} />
       </label>
+      {peut(role, 'equipe') && <RemiseAZero />}
     </section>
   );
 }

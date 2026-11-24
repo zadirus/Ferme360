@@ -77,6 +77,13 @@ export async function listAll(): Promise<Rec[]> {
   return all.filter((r) => !r.deleted);
 }
 
+// Après une remise à zéro de la ferme : on vide les données de ce téléphone et on mémorise la nouvelle époque
+export async function reinitialiserDonnees(epoch: string): Promise<void> {
+  await wrap((await store('records', 'readwrite')).clear());
+  await wrap((await store('meta', 'readwrite')).delete('lastSeq'));
+  await wrap((await store('meta', 'readwrite')).put(epoch, 'epoch'));
+}
+
 // Efface tout sur ce téléphone (changement de personne qui se connecte)
 export async function viderBase(): Promise<void> {
   await wrap((await store('records', 'readwrite')).clear());
