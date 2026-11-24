@@ -1,7 +1,9 @@
 import { useState } from 'preact/hooks';
 import { dataOf, useItems, type Item } from '../hooks';
-import { fmtDate, fmtDec, fmtInt, fmtPct, joursEntre, today } from '../format';
+import { fmtDate, fmtDec, fmtFcfa, fmtInt, fmtPct, joursEntre, OEUFS_PAR_PLATEAU, today } from '../format';
 import { alertes, effectifActuel, indicateurs } from '../poules/calculs';
+import { coutMoyen } from '../gestion/calculs';
+import type { Achat, Article, StockMvt } from '../gestion/types';
 import type { Aliment, Bande, Mortalite, Ramassage, Sante } from '../poules/types';
 import { newId, saveRecord } from '../sync';
 import { Alertes, Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
@@ -25,6 +27,7 @@ export function BandeDetail({ id }: { id: string }) {
   const morts = useItems<Mortalite>('mortalite').filter((x) => x.bandeId === id);
   const aliments = useItems<Aliment>('aliment').filter((x) => x.bandeId === id);
   const santes = useItems<Sante>('sante').filter((x) => x.bandeId === id);
+  const stockMvts = useItems<StockMvt>('stock_mvt');
   const [action, setAction] = useState<Action | null>(null);
   const [message, setMessage] = useState('');
 
@@ -40,6 +43,7 @@ export function BandeDetail({ id }: { id: string }) {
 
   const i = indicateurs(b, ram, morts, aliments);
   const al = alertes(b, ram, morts);
+  const coutAliment = aliments.reduce((sum, a) => sum + (a.cout ?? 0), 0);
   const ageSemaines = b.ageArriveeSemaines + Math.floor(Math.max(0, joursEntre(b.dateArrivee, today())) / 7);
   const rappels = santes.filter((s) => s.rappel && s.rappel >= today()).sort((x, y) => x.rappel.localeCompare(y.rappel));
 
@@ -68,8 +72,13 @@ export function BandeDetail({ id }: { id: string }) {
     })),
     ...aliments.map((a) => ({
       id: a.id, collection: 'aliment', date: a.date, updatedAt: a.updatedAt,
-      texte: `Aliment ${a.type} : ${fmtDec(a.kg)} kg`,
-      supprimer: suppr('aliment', a)
+      texte: `Aliment ${a.type} : ${fmtDec(a.kg)} kg${a.cout ? ` · ${fmtFcfa(a.cout)}` : ''}`,
+      supprimer: async () => {
+        if (!window.confirm('Supprimer cette saisie ? Le stock d’aliment sera rétabli.')) return;
+        await saveRecord('aliment', a.id, dataOf(a), true);
+        for (const m of stockMvts.filter((x) => x.alimentId === a.id)) await saveRecord('stock_mvt', m.id, dataOf(m), true);
+        setMessage('Saisie supprimée');
+      }
     })),
     ...santes.map((s) => ({
       id: s.id, collection: 'sante', date: s.date, updatedAt: s.updatedAt,
@@ -104,16 +113,18 @@ export function BandeDetail({ id }: { id: string }) {
         <Stat valeur={fmtDec(i.oeufsParPoule, 1)} label="Œufs par poule départ" />
         <Stat valeur={`${fmtDec(i.alimentKg, 0)} kg`} label="Aliment distribué" />
         <Stat valeur={i.indiceConso !== null ? fmtDec(i.indiceConso, 2) : '—'} label="Indice de consommation" />
+        {coutAliment > 0 && <Stat valeur={fmtFcfa(coutAliment)} label="Coût de l'aliment" />}
+        {coutAliment > 0 && i.oeufsCumules > 0 && <Stat valeur={fmtFcfa(coutAliment / (i.oeufsCumules / OEUFS_PAR_PLATEAU))} label="Aliment par plateau" />}
       </div>
 
       {message && <p class="succes" role="status">{message}</p>}
 
       {!b.cloturee && !action && (
         <div class="actions">
-          <button class="principal" type="button" onClick={() => setAction('ramassage')}>🥚 Ramassage</button>
-          <button class="principal" type="button" onClick={() => setAction('mortalite')}>Mortalité / réforme</button>
-          <button class="principal" type="button" onClick={() => setAction('aliment')}>Aliment</button>
-          <button class="principal" type="button" onClick={() => setAction('sante')}>Santé</button>
+          <button class="principal" type="button" onClick={() => setAction('ramassage')}><span class="e">🥚</span>Ramassage</button>
+          <button class="principal" type="button" onClick={() => setAction('mortalite')}><span class="e">💀</span>Mortalité / réforme</button>
+          <button class="principal" type="button" onClick={() => setAction('aliment')}><span class="e">🌽</span>Aliment</button>
+          <button class="principal" type="button" onClick={() => setAction('sante')}><span class="e">💉</span>Santé</button>
         </div>
       )}
 
@@ -217,21 +228,37 @@ function MortaliteForm({ bandeId, effectif, onFini }: FormProps & { effectif: nu
 }
 
 function AlimentForm({ bandeId, onFini }: FormProps) {
+  const articles = useItems<Article>('article').filter((a) => a.categorie === 'aliment');
+  const achats = useItems<Achat>('achat');
+  const mvts = useItems<StockMvt>('stock_mvt');
   const [date, setDate] = useState(today());
   const [type, setType] = useState<Aliment['type']>('ponte');
   const [kg, setKg] = useState('');
+  const [articleId, setArticleId] = useState('');
+  const article = articles.find((a) => a.id === articleId);
   async function envoyer(e: Event) {
     e.preventDefault();
     const q = nombre(kg);
     if (q <= 0) return;
-    await enregistrer('aliment', { bandeId, date, kg: q, type } satisfies Aliment);
+    const unites = article ? q / article.kgParUnite : 0;
+    if (article) {
+      const stock = mvts.filter((m) => m.articleId === article.id).reduce((sum, m) => (m.type === 'sortie' ? sum - m.quantite : sum + m.quantite), 0);
+      if (unites > stock && !window.confirm(`Le stock de ${article.nom} deviendrait négatif. Continuer ?`)) return;
+    }
+    const alimentId = newId();
+    const cout = article ? Math.round(unites * coutMoyen(article.id, achats)) : 0;
+    await saveRecord('aliment', alimentId, { bandeId, date, kg: q, type, ...(article ? { articleId: article.id, cout } : {}) } satisfies Aliment);
+    if (article) {
+      await saveRecord('stock_mvt', newId(), { articleId: article.id, date, type: 'sortie', quantite: unites, peremption: '', achatId: '', alimentId, note: '' } satisfies StockMvt);
+    }
     onFini('Aliment enregistré');
   }
   return (
     <form class="formulaire" onSubmit={envoyer}>
       <h3>Aliment distribué</h3>
       <Choix label="Type d'aliment" value={type} onChange={setType} options={[['demarrage', 'Démarrage'], ['croissance', 'Croissance'], ['ponte', 'Ponte']]} />
-      <Champ label="Quantité" type="number" min={0} value={kg} onChange={setKg} suffixe="kg" required />
+      <Choix label="Pris dans le stock" value={articleId} onChange={setArticleId} options={[['', 'Sans suivi de stock'], ...articles.map((a) => [a.id, a.nom] as [string, string])]} />
+      <Champ label="Quantité distribuée" type="number" min={0} value={kg} onChange={setKg} suffixe="kg" required />
       <Champ label="Date" type="date" max={today()} value={date} onChange={setDate} required />
       <Boutons onAnnuler={() => onFini('')} />
     </form>

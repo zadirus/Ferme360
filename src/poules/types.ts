@@ -32,6 +32,8 @@ export interface Aliment {
   date: string;
   kg: number;
   type: 'demarrage' | 'croissance' | 'ponte';
+  articleId?: string; // article du stock d'aliment utilisé
+  cout?: number; // coût en FCFA au moment de la distribution
 }
 
 export interface Sante {
@@ -49,4 +51,5 @@ export interface MvtOeufs {
   type: 'vente' | 'consommation' | 'casse' | 'ajustement';
   quantite: number; // en œufs ; négatif possible pour un ajustement
   note: string;
+  venteId?: string; // sortie créée par une vente
 }

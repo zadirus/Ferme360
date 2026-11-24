@@ -71,3 +71,8 @@ export async function getMeta<T>(key: string): Promise<T | undefined> {
 export async function setMeta(key: string, value: unknown): Promise<void> {
   await wrap((await store('meta', 'readwrite')).put(value, key));
 }
+
+export async function listAll(): Promise<Rec[]> {
+  const all = await wrap<Rec[]>((await store('records', 'readonly')).getAll());
+  return all.filter((r) => !r.deleted);
+}

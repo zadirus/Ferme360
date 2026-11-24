@@ -44,13 +44,14 @@ export function Auth({ onDone, reconnect }: Props) {
     }
   }
 
-  if (configured === null) return <main><p>Chargement…</p></main>;
+  if (configured === null) return <main class="contenu"><p class="intro">Chargement…</p></main>;
 
   return (
-    <main>
-      <header>
-        <h1>Ferme360</h1>
-      </header>
+    <main class="contenu">
+      <div class="accueil-auth">
+        <span class="logo-grand" aria-hidden="true">🌾</span>
+        <h2>Ferme360</h2>
+      </div>
       <p class="intro">
         {configured
           ? reconnect

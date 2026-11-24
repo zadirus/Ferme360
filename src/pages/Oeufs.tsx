@@ -30,6 +30,7 @@ export function Oeufs() {
     <section>
       <Retour vers="/" texte="Accueil" />
       <h2>Stock d'œufs</h2>
+      <p class="intro">Pour vendre des œufs, utilisez l'onglet Ventes : la sortie du stock se fait toute seule.</p>
       <div class="stats">
         <Stat valeur={fmtInt(stock)} label="Œufs en stock" />
         <Stat valeur={fmtPlateaux(stock)} label={`(1 plateau = ${OEUFS_PAR_PLATEAU} œufs)`} />
@@ -37,8 +38,8 @@ export function Oeufs() {
       {message && <p class="succes" role="status">{message}</p>}
       {!mode && (
         <div class="actions">
-          <button class="principal" type="button" onClick={() => setMode('sortie')}>Sortie d'œufs</button>
-          <button class="principal" type="button" onClick={() => setMode('inventaire')}>Compter le stock</button>
+          <button class="principal" type="button" onClick={() => setMode('sortie')}><span class="e">📤</span>Sortie d'œufs</button>
+          <button class="principal" type="button" onClick={() => setMode('inventaire')}><span class="e">🔢</span>Compter le stock</button>
         </div>
       )}
       {mode === 'sortie' && <SortieForm stock={stock} onFini={fini} />}
@@ -53,7 +54,7 @@ export function Oeufs() {
               {fmtInt(m.quantite)} œufs{m.note ? ` (${m.note})` : ''}
             </span>
             <small>{fmtDate(m.date)}</small>
-            <button
+            {!m.venteId && <button
               type="button"
               class="lien"
               onClick={async () => {
@@ -63,17 +64,17 @@ export function Oeufs() {
               }}
             >
               Supprimer
-            </button>
+            </button>}
           </li>
         ))}
-        {liste.length === 0 && <li class="vide">Aucun mouvement. Les œufs ramassés entrent seuls dans le stock.</li>}
+        {liste.length === 0 && <li class="vide">Aucun mouvement. Les œufs ramassés entrent seuls dans le stock ; les ventes en sortent seules.</li>}
       </ul>
     </section>
   );
 }
 
 function SortieForm({ stock, onFini }: { stock: number; onFini: (m: string) => void }) {
-  const [type, setType] = useState<'vente' | 'consommation' | 'casse'>('vente');
+  const [type, setType] = useState<'consommation' | 'casse'>('consommation');
   const [qte, setQte] = useState('');
   const [unite, setUnite] = useState<'plateaux' | 'oeufs'>('plateaux');
   const [date, setDate] = useState(today());
@@ -92,7 +93,7 @@ function SortieForm({ stock, onFini }: { stock: number; onFini: (m: string) => v
   return (
     <form class="formulaire" onSubmit={envoyer}>
       <h3>Sortie d'œufs</h3>
-      <Choix label="Motif" value={type} onChange={setType} options={[['vente', 'Vente'], ['consommation', 'Consommation'], ['casse', 'Casse au stockage']]} />
+      <Choix label="Motif" value={type} onChange={setType} options={[['consommation', 'Consommation'], ['casse', 'Casse au stockage']]} />
       <Champ label="Quantité" type="number" min={0} value={qte} onChange={setQte} required />
       <Choix label="Unité" value={unite} onChange={setUnite} options={[['plateaux', 'Plateaux'], ['oeufs', 'Œufs']]} />
       <Champ label="Date" type="date" max={today()} value={date} onChange={setDate} required />

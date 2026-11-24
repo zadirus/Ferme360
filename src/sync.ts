@@ -50,7 +50,7 @@ export async function saveRecord(collection: string, id: string, data: object, d
   };
   await putRecord(rec);
   await refreshPending();
-  notifyData();
+  await notifyData();
   scheduleSync();
 }
 
@@ -115,13 +115,14 @@ export async function syncNow(): Promise<void> {
 }
 
 // Les écrans écoutent ce signal pour se rafraîchir quand des données arrivent.
-const dataListeners = new Set<() => void>();
-export function onData(fn: () => void) {
+const dataListeners = new Set<() => void | Promise<void>>();
+export function onData(fn: () => void | Promise<void>) {
   dataListeners.add(fn);
   return () => dataListeners.delete(fn);
 }
-export function notifyData() {
-  dataListeners.forEach((l) => l());
+// Rend la main quand les écrans ont fini de se mettre à jour.
+export function notifyData(): Promise<void> {
+  return Promise.all([...dataListeners].map((l) => l())).then(() => undefined);
 }
 
 export function startAutoSync(): () => void {

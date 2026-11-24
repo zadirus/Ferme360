@@ -20,3 +20,13 @@ Avant de livrer : `npm run build` doit passer.
 - Seuils d'alerte par défaut (constantes dans calculs.ts, à rendre modifiables à l'étape 6) : chute de ponte > 5 points en 3 jours, mortalité > max(2, 1 %) en un jour.
 - Navigation par hash (`#/poules`, `#/poules/<id>`, `#/oeufs`, `#/carnet`), barre d'onglets en bas.
 - À faire à l'étape 4 : lier l'aliment au stock d'aliment, les ventes d'œufs aux clients, coût de revient du plateau.
+
+## Ventes, stocks, argent (étape 4)
+- Collections : `client`, `vente`, `paiement`, `fournisseur`, `article`, `achat`, `reglement`, `stock_mvt`, `depense`, `treso_mvt` (types dans `src/gestion/types.ts`, calculs testés dans `src/gestion/calculs.ts`).
+- Une vente d'œufs crée seule la sortie du stock d'œufs (`oeufs_mvt.venteId`) et son paiement (`paiement.venteId`) ; supprimer la vente supprime les trois.
+- Créance = ventes − paiements du client ; les paiements soldent d'abord les ventes les plus anciennes (ancienneté pour l'alerte à 30 jours).
+- Stock d'article = mouvements (entrée, sortie, ajustement) ; lots avec péremption consommés du plus proche au plus lointain (FIFO) ; alerte à 30 jours et au seuil.
+- Aliment : une distribution peut être prélevée sur un article du stock (kg ÷ `kgParUnite` = unités sorties), coût = unités × coût moyen d'achat.
+- Argent : soldes caisse / Mobile Money / banque calculés (paiements − achats payés − règlements − dépenses ± corrections) ; résultat par activité = ventes − achats − dépenses (achats comptés à la date d'achat ; charges « commun » non réparties pour l'instant).
+- Écrans : `useItems` (src/hooks.ts) lit un instantané unique rechargé en bloc après chaque saisie ; `saveRecord` rend la main une fois les écrans à jour.
+- Test de parcours complet : `npx wrangler dev --port 8790` puis `BASE=http://localhost:8790 node e2e/etape4.cjs` (Playwright).

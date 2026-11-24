@@ -20,26 +20,23 @@ export function StatusBar() {
   let classe = 'ok';
   if (!online) {
     classe = 'hors';
-    texte = s.pending ? `Hors ligne · ${s.pending} saisie(s) en attente` : 'Hors ligne · tout est enregistré sur le téléphone';
+    texte = s.pending ? `Hors ligne · ${s.pending} saisie(s) en attente` : 'Hors ligne';
   } else if (s.syncing) {
     classe = 'attente';
     texte = 'Synchronisation…';
   } else if (s.error) {
     classe = 'hors';
-    texte = `Synchronisation impossible (${s.error})`;
+    texte = 'Synchronisation impossible';
   } else if (s.pending) {
     classe = 'attente';
-    texte = `${s.pending} saisie(s) à envoyer`;
+    texte = `${s.pending} à envoyer`;
   } else {
     texte = 'À jour';
   }
 
   return (
-    <div class={`barre ${classe}`} role="status">
-      <span>{texte}</span>
-      <button type="button" disabled={!online || s.syncing} onClick={() => void syncNow()}>
-        Synchroniser
-      </button>
-    </div>
+    <button type="button" class={`pastille ${classe}`} role="status" disabled={!online || s.syncing} onClick={() => void syncNow()} aria-label="Synchroniser">
+      {texte}
+    </button>
   );
 }
