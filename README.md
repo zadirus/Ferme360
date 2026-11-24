@@ -11,10 +11,11 @@ npm run dev      # serveur local
 npm run build    # construit dans dist/
 ```
 
-## Déploiement (Cloudflare Pages)
+## Déploiement (Cloudflare Workers, fichiers statiques)
 
+- Nom du projet : `ferme360` (voir `wrangler.jsonc`)
 - Commande de build : `npm run build`
-- Dossier de sortie : `dist`
-- Variable : `NODE_VERSION` = `22`
+- Commande de déploiement : `npx wrangler deploy`
+- Variable (si besoin) : `NODE_VERSION` = `22`
 
-Chaque envoi sur `main` met la production à jour ; chaque autre branche reçoit une adresse d'aperçu.
+Chaque envoi sur `main` met la production à jour ; les autres branches reçoivent une adresse d'aperçu.
