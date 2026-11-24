@@ -38,11 +38,11 @@ export function newId(): string {
   return crypto.randomUUID();
 }
 
-export async function saveRecord(collection: string, id: string, data: Record<string, unknown>, deleted = false) {
+export async function saveRecord(collection: string, id: string, data: object, deleted = false) {
   const rec: Rec = {
     id,
     collection,
-    data,
+    data: data as Record<string, unknown>,
     updatedAt: await now(),
     deleted,
     author: getUser()?.name ?? '',
@@ -50,6 +50,7 @@ export async function saveRecord(collection: string, id: string, data: Record<st
   };
   await putRecord(rec);
   await refreshPending();
+  notifyData();
   scheduleSync();
 }
 
