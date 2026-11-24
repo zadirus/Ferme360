@@ -1,0 +1,12 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: #f6f3ea; color: #1f2a1f; }
+main { max-width: 520px; margin: 0 auto; padding: 16px; }
+header { display: flex; justify-content: space-between; align-items: center; }
+h1 { margin: 0; font-size: 1.6rem; color: #2f6b3a; }
+.etat { padding: 4px 10px; border-radius: 999px; font-size: .85rem; color: #fff; }
+.ok { background: #2f6b3a; }
+.hors { background: #b3541e; }
+.intro { color: #4b574b; }
+ul { list-style: none; padding: 0; display: grid; gap: 12px; }
+li { background: #fff; border-radius: 12px; padding: 18px; display: grid; gap: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.08); min-height: 64px; }
+li span { color: #5d695d; font-size: .9rem; }
