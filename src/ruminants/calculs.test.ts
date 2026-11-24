@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ageEnMois, ajouteJours } from '../format';
-import { etatAnimal, fertilite, finDelaiAttente, gmqAnimal, gmqMoyen, indicateursLot, miseBasPrevue, mortaliteAvantSevrage, prolificite, propositionsReforme, tachesAutomatiques } from './calculs';
+import { etatAnimal, fertilite, finDelaiAttente, gmqAnimal, gmqMoyen, indicateursLot, miseBasPrevue, margeAnimal, mortaliteAvantSevrage, prolificite, propositionsReforme, tachesAutomatiques } from './calculs';
 import type { Animal, MiseBas, MvtAnimal, Pesee, Ration, Repro, Soin } from './types';
 
 const mvt = (animalId: string, date: string, type: MvtAnimal['type'], motif: MvtAnimal['motif'], lotId = '', maj = 1): MvtAnimal & { updatedAt: number } =>
@@ -138,5 +138,16 @@ describe('rappels automatiques, réforme, mortalité des petits', () => {
     expect(mortaliteAvantSevrage('ovin', [mere, p1, p2], [mort('p1', '2026-07-01')], [mb])!.toFixed(1)).toBe('66.7');
     expect(mortaliteAvantSevrage('ovin', [mere, p1, p2], [mort('p1', '2026-12-01')], [mb])!.toFixed(1)).toBe('33.3'); // mort après le sevrage : pas compté
     expect(mortaliteAvantSevrage('bovin', [mere], [], [])).toBeNull();
+  });
+});
+
+describe('marge par animal vendu', () => {
+  it('prix de vente − achat − soins − part du lot', () => {
+    // bœuf acheté 300 000, 4 000 de soins, lot de 4 animaux ayant coûté 100 000 de rations et 16 000 de soins : part = 29 000
+    const m = margeAnimal(512000, 300000, 4000, 100000, 16000, 4);
+    expect(m.partLot).toBe(29000);
+    expect(m.couts).toBe(333000);
+    expect(m.marge).toBe(179000);
+    expect(margeAnimal(100, 0, 0, 0, 0, 0).marge).toBe(100);
   });
 });

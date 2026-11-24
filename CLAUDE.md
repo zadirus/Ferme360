@@ -83,3 +83,7 @@ Avant de livrer : `npm run build` doit passer.
 - Lait : `traite` (litres) + vente article `lait` (unité litre, activité bovins). Traction : `travail` (jours, recette) ; une recette crée une vente + son paiement (supprimés avec le travail).
 - Courbes de croissance : `src/courbe.tsx` (animal et moyenne du lot).
 - Test : `e2e/ruminants2.cjs`.
+
+## Argent : charges communes et marge par animal (étape 7, lot 5)
+- `resultatsRepartis` (src/gestion/calculs.ts) : les charges de l'activité « commun » sont réparties entre poules, moutons et bœufs au prorata de leurs ventes (clé de répartition) ; si aucun élevage n'a de vente, elles restent « non réparties ». La somme des marges nettes + charges non réparties = marge de la ferme. Utilisé par la page Argent et le rapport mensuel.
+- `margeAnimal` (src/ruminants/calculs.ts) : prix de vente − (prix d'achat + soins de l'animal + part égale des rations et soins de son lot), affichée sur la fiche d'un animal vendu (propriétaire et gérant).

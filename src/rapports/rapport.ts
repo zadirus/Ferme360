@@ -1,5 +1,5 @@
 import { ajouteJours, fmtDate, fmtDec, fmtInt, OEUFS_PAR_PLATEAU } from '../format';
-import { creances, detteFournisseur, resultats, soldesComptes } from '../gestion/calculs';
+import { creances, detteFournisseur, resultatsRepartis, soldesComptes } from '../gestion/calculs';
 import { resumeLigne } from '../gestion/resume';
 import { ACTIVITES, nomActivite, type Achat, type Client, type Depense, type Fournisseur, type Paiement, type Reglement, type TresoMvt, type Vente } from '../gestion/types';
 import { stockOeufs, tauxPonteJour } from '../poules/calculs';
@@ -53,13 +53,15 @@ export function construireRapport(mois: string, d: DonneesRapport, aujourdhui: s
   const depenses = d.depenses.filter((x) => dansLeMois(x.date));
 
   // 1. résultat par activité
-  const res = resultats(ventes, achats, depenses, ACTIVITES.map(([k]) => k));
-  const tot = res.reduce((s, r) => ({ v: s.v + r.ventes, c: s.c + r.charges }), { v: 0, c: 0 });
+  const res = resultatsRepartis(ventes, achats, depenses);
   const secResultat: Section = {
     titre: 'Résultat par activité (FCFA)',
-    colonnes: ['Activité', 'Ventes', 'Charges', 'Marge'],
-    lignes: [...res.map((r) => [nomActivite(r.activite), Math.round(r.ventes), Math.round(r.charges), Math.round(r.marge)]), ['Total', Math.round(tot.v), Math.round(tot.c), Math.round(tot.v - tot.c)]],
-    note: 'Les achats sont comptés le jour où ils sont faits. Les charges « commun » ne sont pas réparties entre les élevages.'
+    colonnes: ['Activité', 'Ventes', 'Charges directes', 'Part des charges communes', 'Marge nette'],
+    lignes: [
+      ...res.lignes.map((r) => [nomActivite(r.activite), Math.round(r.ventes), Math.round(r.chargesDirectes), Math.round(r.partCommun), Math.round(r.margeNette)]),
+      ['Total ferme', Math.round(res.totalVentes), Math.round(res.totalCharges), 0, Math.round(res.margeFerme)]
+    ],
+    note: `Les achats sont comptés le jour où ils sont faits. Charges communes (${Math.round(res.chargesCommunes).toLocaleString('fr-FR')} FCFA) réparties au prorata des ventes de chaque élevage.`
   };
 
   // 2. poules

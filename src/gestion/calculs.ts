@@ -147,3 +147,43 @@ export function coutDistribution(rec: { kg: number; articleId?: string; cout?: n
   }
   return rec.cout ?? 0;
 }
+
+// ---------- charges communes réparties ----------
+
+export interface ResultatReparti {
+  activite: Activite;
+  ventes: number;
+  chargesDirectes: number;
+  partCommun: number;
+  margeBrute: number;
+  margeNette: number;
+}
+
+export interface ResultatsFerme {
+  lignes: ResultatReparti[];
+  communVentes: number; // ventes classées « commun » (non réparties)
+  chargesCommunes: number;
+  nonReparti: number; // charges communes qui n'ont pas pu être réparties (aucune vente à la clé de répartition)
+  totalVentes: number;
+  totalCharges: number;
+  margeFerme: number;
+}
+
+// Clé de répartition : les charges de l'activité « commun » sont réparties au prorata des ventes de chaque élevage
+export function resultatsRepartis(ventes: Vente[], achats: Achat[], depenses: Depense[]): ResultatsFerme {
+  const vs = ventes.filter((v) => !v.reprise);
+  const somme = (a: Activite) => vs.filter((x) => x.activite === a).reduce((s, x) => s + x.total, 0);
+  const charges = (a: Activite) => achats.filter((x) => x.activite === a).reduce((s, x) => s + x.total, 0) + depenses.filter((x) => x.activite === a).reduce((s, x) => s + x.montant, 0);
+  const elevages: Activite[] = ['poules', 'ovins', 'bovins'];
+  const ca = elevages.reduce((s, a) => s + somme(a), 0);
+  const commun = charges('commun');
+  const lignes = elevages.map((activite) => {
+    const v = somme(activite);
+    const d = charges(activite);
+    const part = ca > 0 ? (commun * v) / ca : 0;
+    return { activite, ventes: v, chargesDirectes: d, partCommun: part, margeBrute: v - d, margeNette: v - d - part };
+  });
+  const totalVentes = vs.reduce((s, x) => s + x.total, 0);
+  const totalCharges = elevages.reduce((s, a) => s + charges(a), 0) + commun;
+  return { lignes, communVentes: somme('commun'), chargesCommunes: commun, nonReparti: ca > 0 ? 0 : commun, totalVentes, totalCharges, margeFerme: totalVentes - totalCharges };
+}

@@ -28,8 +28,8 @@ describe('rapports', () => {
 
   it('résultat par activité du mois', () => {
     const doc = construireRapport('2026-11', donnees, '2026-11-24');
-    const total = doc.sections[0].lignes.find((l) => l[0] === 'Total')!;
-    expect(total).toEqual(['Total', 20000, 340000, -320000]);
+    const total = doc.sections[0].lignes.find((l) => l[0] === 'Total ferme')!;
+    expect(total).toEqual(['Total ferme', 20000, 340000, 0, -320000]);
     expect(doc.sections[1].lignes[1][1]).toBe('85,0 %');
   });
 

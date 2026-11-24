@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alertesArticle, coutMoyen, creances, detteFournisseur, lotsRestants, oeufsVendus, soldesComptes, stockArticle, totalLignes } from './calculs';
+import { alertesArticle, coutMoyen, creances, detteFournisseur, lotsRestants, oeufsVendus, resultatsRepartis, soldesComptes, stockArticle, totalLignes } from './calculs';
 import type { Achat, Article, Depense, Paiement, StockMvt, Vente } from './types';
 
 const ligne = { article: 'oeufs' as const, libelle: '', quantite: 10, unite: 'plateau' as const, prixUnitaire: 2500 };
@@ -73,5 +73,32 @@ describe('stocks, achats et dettes', () => {
   it('dette fournisseur = achats non payés − règlements', () => {
     const achats = [{ fournisseurId: 'f1', total: 100000, montantPaye: 40000 }] as Achat[];
     expect(detteFournisseur('f1', achats, [{ date: '', fournisseurId: 'f1', montant: 25000, compte: 'caisse' }])).toBe(35000);
+  });
+});
+
+describe('charges communes réparties', () => {
+  const v = (activite: Vente['activite'], total: number, reprise = false): Vente => ({ date: '2026-11-02', clientId: '', activite, lignes: [], total, note: '', reprise });
+  const dep = (activite: Depense['activite'], montant: number): Depense => ({ date: '2026-11-03', activite, categorie: 'Électricité et eau', libelle: '', montant, compte: 'caisse' });
+
+  it('les charges communes sont réparties au prorata des ventes de chaque élevage', () => {
+    const r = resultatsRepartis([v('poules', 300000), v('ovins', 100000), v('bovins', 0), v('poules', 999999, true)], [], [dep('poules', 50000), dep('commun', 40000)]);
+    const par = Object.fromEntries(r.lignes.map((l) => [l.activite, l]));
+    expect(par.poules.partCommun).toBe(30000); // 40 000 × 300 000 / 400 000
+    expect(par.ovins.partCommun).toBe(10000);
+    expect(par.bovins.partCommun).toBe(0);
+    expect(par.poules.margeBrute).toBe(250000);
+    expect(par.poules.margeNette).toBe(220000);
+    expect(par.ovins.margeNette).toBe(90000);
+    // la somme des marges nettes + les charges non réparties = la marge de la ferme : rien n'est perdu ni compté deux fois
+    expect(r.lignes.reduce((s, l) => s + l.margeNette, 0)).toBe(r.margeFerme);
+    expect(r.margeFerme).toBe(400000 - 50000 - 40000);
+    expect(r.nonReparti).toBe(0);
+  });
+
+  it('sans aucune vente, les charges communes restent non réparties', () => {
+    const r = resultatsRepartis([], [], [dep('commun', 40000)]);
+    expect(r.nonReparti).toBe(40000);
+    expect(r.lignes.every((l) => l.partCommun === 0)).toBe(true);
+    expect(r.margeFerme).toBe(-40000);
   });
 });

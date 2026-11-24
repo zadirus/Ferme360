@@ -185,3 +185,12 @@ export function mortaliteAvantSevrage(espece: 'ovin' | 'bovin', animaux: Array<A
   const morts = petits.filter((a) => mvts.some((m) => m.animalId === a.id && m.type === 'sortie' && m.motif === 'mort' && joursEntre(a.naissance, m.date) <= jours)).length;
   return ((mb.reduce((s, m) => s + m.mortNes, 0) + morts) / nes) * 100;
 }
+
+export interface MargeAnimal { vente: number; achat: number; soins: number; partLot: number; couts: number; marge: number }
+
+// Marge sur un animal vendu : prix de vente − (achat + soins de l'animal + part égale des rations et soins de son lot)
+export function margeAnimal(vente: number, prixAchat: number, soinsPropres: number, coutRationsLot: number, coutSoinsLot: number, nbAnimauxLot: number): MargeAnimal {
+  const partLot = nbAnimauxLot > 0 ? (coutRationsLot + coutSoinsLot) / nbAnimauxLot : 0;
+  const couts = prixAchat + soinsPropres + partLot;
+  return { vente, achat: prixAchat, soins: soinsPropres, partLot, couts, marge: vente - couts };
+}

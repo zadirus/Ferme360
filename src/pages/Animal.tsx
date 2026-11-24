@@ -4,7 +4,9 @@ import { peut, peutEcrire } from '../droits';
 import { ageEnMois, fmtDate, fmtDec, fmtFcfa, joursEntre, today } from '../format';
 import { COMPTES, type Compte, type Depense, type Paiement, type Vente } from '../gestion/types';
 import { CroissanceAnimal, fmtLitres, litresSur, PhotosAnimal, supprimerTravail, TraiteForm, TravailForm } from './RuminantsExtras';
-import { dernierPoids, finDelaiAttente, gmq, gmqAnimal, miseBasPrevue, poidsAnimal } from '../ruminants/calculs';
+import { dernierPoids, finDelaiAttente, gmq, gmqAnimal, margeAnimal, miseBasPrevue, poidsAnimal } from '../ruminants/calculs';
+import { coutDistribution } from '../gestion/calculs';
+import type { Article } from '../gestion/types';
 import { libelleAnimal, useRuminants } from '../ruminants/donnees';
 import {
   ACTIVITE_ESPECE, ICONE_ESPECE, NOM_ESPECE, NOM_SOIN,
@@ -22,6 +24,7 @@ export function AnimalDetail({ id }: { id: string }) {
   const r = useRuminants();
   const [action, setAction] = useState<Action | null>(null);
   const [message, setMessage] = useState('');
+  const articlesT = useItems<Article>('article');
   const ventesT = useItems<Vente>('vente');
   const paiementsT = useItems<Paiement>('paiement');
   const role = useRole();
@@ -92,6 +95,24 @@ export function AnimalDetail({ id }: { id: string }) {
         {argent && a.origine === 'achete' && <Stat valeur={fmtFcfa(a.prixAchat)} label={`Acheté le ${fmtDate(a.dateAchat)}${a.vendeur ? ` à ${a.vendeur}` : ''}`} />}
       </div>
       {message && <p class="succes" role="status">{message}</p>}
+
+      {argent && etat.statut === 'vendu' && (() => {
+        const vente = ventesT.filter((v) => !v.reprise).flatMap((v) => v.lignes).filter((l) => l.animalId === id).reduce((s, l) => s + l.quantite * l.prixUnitaire, 0);
+        const passes = r.animaux.filter((x) => r.etat(x.id).lotId === etat.lotId && etat.lotId);
+        const rationsLot = r.rations.filter((x) => x.lotId === etat.lotId && etat.lotId).reduce((s, x) => s + coutDistribution(x, articlesT, r.achats), 0);
+        const soinsLot = r.soins.filter((s) => s.lotId === etat.lotId && etat.lotId).reduce((s, x) => s + x.cout, 0);
+        const m = margeAnimal(vente, a.prixAchat, r.soins.filter((s) => s.animalId === id).reduce((s, x) => s + x.cout, 0), rationsLot, soinsLot, passes.length);
+        return (
+          <>
+            <h3>Marge sur cet animal</h3>
+            <div class="stats">
+              <Stat valeur={fmtFcfa(m.marge)} label={`Vendu ${fmtFcfa(m.vente)} − coûts ${fmtFcfa(m.couts)}`} />
+              <Stat valeur={fmtFcfa(m.couts)} label={`Achat ${fmtFcfa(m.achat)} + soins ${fmtFcfa(m.soins)} + part du lot ${fmtFcfa(m.partLot)}`} />
+            </div>
+            <p class="intro">La part du lot (rations et soins collectifs) est répartie à parts égales entre les animaux du lot.</p>
+          </>
+        );
+      })()}
 
       {present && !action && (
         <div class="actions">

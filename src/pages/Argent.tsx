@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { dataOf, useItems } from '../hooks';
 import { fmtDate, fmtFcfa, today } from '../format';
-import { creances, detteFournisseur, resultats, soldesComptes } from '../gestion/calculs';
+import { creances, detteFournisseur, resultatsRepartis, soldesComptes } from '../gestion/calculs';
 import {
   ACTIVITES, CATEGORIES_DEPENSE, COMPTES, nomActivite, nomCompte,
   type Achat, type Activite, type Compte, type Depense, type Fournisseur, type Paiement, type Reglement, type StockMvt, type TresoMvt, type Vente
@@ -30,7 +30,7 @@ export function Argent() {
   const aEncaisser = creances(ventes, paiements, today()).reduce((s, c) => s + c.solde, 0);
   const dettes = fournisseurs.map((f) => ({ f, dette: detteFournisseur(f.id, achats, reglements) }));
   const detteTotale = dettes.reduce((s, d) => s + Math.max(0, d.dette), 0);
-  const res = resultats(ventes, achats, depenses, ACTIVITES.map(([k]) => k));
+  const res = resultatsRepartis(ventes, achats, depenses);
   const fini = (m: string) => { setMode(null); setPayer(null); setMessage(m); };
 
   const sorties = [
@@ -73,14 +73,18 @@ export function Argent() {
 
       <h3>Résultat par activité</h3>
       <ul>
-        {res.map((r) => (
+        {res.lignes.map((r) => (
           <li key={r.activite}>
-            <div class="ligne"><strong>{nomActivite(r.activite as Activite)}</strong><span class={`montant ${r.marge < 0 ? 'dette' : ''}`}>{fmtFcfa(r.marge)}</span></div>
-            <small>Ventes {fmtFcfa(r.ventes)} − charges {fmtFcfa(r.charges)}</small>
+            <div class="ligne"><strong>{nomActivite(r.activite as Activite)}</strong><span class={`montant ${r.margeNette < 0 ? 'dette' : ''}`}>{fmtFcfa(r.margeNette)}</span></div>
+            <small>Ventes {fmtFcfa(r.ventes)} − charges directes {fmtFcfa(r.chargesDirectes)} − part des charges communes {fmtFcfa(r.partCommun)}</small>
           </li>
         ))}
+        <li>
+          <div class="ligne"><strong>Toute la ferme</strong><span class={`montant ${res.margeFerme < 0 ? 'dette' : ''}`}>{fmtFcfa(res.margeFerme)}</span></div>
+          <small>Ventes {fmtFcfa(res.totalVentes)} − charges {fmtFcfa(res.totalCharges)}</small>
+        </li>
       </ul>
-      <p class="intro">Les achats sont comptés le jour où vous les faites. Les charges « commun » ne sont pas encore réparties entre les élevages.</p>
+      <p class="intro">Les achats sont comptés le jour où vous les faites. Les charges de l'activité « Commun à la ferme » ({fmtFcfa(res.chargesCommunes)}) sont réparties entre les élevages au prorata de leurs ventes{res.nonReparti > 0 ? ` : aucune vente pour le moment, ${fmtFcfa(res.nonReparti)} restent non réparties` : ''}.</p>
 
       {dettes.length > 0 && (
         <>

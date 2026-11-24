@@ -76,7 +76,7 @@ const iso = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.
   ok((await P.getByText(/Chute de ponte/).count()) === 0, 'baisse de 2,5 points : pas d’alerte avec le seuil par défaut (5)');
   await aller('/reglages');
   await P.getByLabel(/Alerte de chute de ponte/).fill('1');
-  await btn('Enregistrer').click();
+  await P.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await P.getByText(/Réglages enregistrés/).waitFor();
   await aller('/');
   await P.getByText(/Chute de ponte/).first().waitFor({ timeout: 5000 });
