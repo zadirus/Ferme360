@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [
     preact(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'sw',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
@@ -23,7 +26,7 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       },
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,ico}'], navigateFallbackDenylist: [/^\/api\//] }
+      injectManifest: { globPatterns: ['**/*.{js,css,html,svg,png,ico}'] }
     })
   ]
 });

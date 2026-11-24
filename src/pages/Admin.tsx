@@ -31,6 +31,8 @@ export function Plus() {
         {peut(role, 'equipe') && lien('/equipe', '👥', 'Équipe', 'Créer les comptes et choisir les droits')}
         {peut(role, 'journal') && lien('/journal', '🕑', 'Journal des modifications', 'Qui a modifié ou supprimé quoi')}
         {peut(role, 'sauvegarde') && lien('/sauvegarde', '💾', 'Sauvegarde', 'Exporter ou restaurer toutes les données')}
+        {lien('/notifications', '🔔', 'Notifications', 'Le résumé du matin sur ce téléphone')}
+        {lien('/pin', '🔒', 'Code PIN', 'Verrouiller l’application sur ce téléphone')}
         {lien('/mdp', '🔑', 'Mon mot de passe', 'Le changer')}
       </ul>
       <button

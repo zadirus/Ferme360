@@ -7,6 +7,10 @@ import { peut } from './droits';
 import { appliquerReglages, ID_REGLAGES, type Reglages as TypeReglages } from './reglages';
 import { Equipe, Journal, MotDePasse, Plus } from './pages/Admin';
 import { Rapports } from './pages/Rapports';
+import { Notifications } from './pages/Notifications';
+import { Pin } from './pages/Pin';
+import { pinDefini } from './pin';
+import { Verrou } from './Verrou';
 import { Reglages } from './pages/Reglages';
 import { Sauvegarde } from './pages/Sauvegarde';
 import { Accueil } from './pages/Accueil';
@@ -46,6 +50,7 @@ function autorise(route: string, role: string): boolean {
 export function App() {
   const [user, setUser] = useState<User | null>(() => (getToken() ? getUser() : null));
   const [needLogin, setNeedLogin] = useState(false);
+  const [verrouille, setVerrouille] = useState(() => pinDefini());
   const route = useHash();
   const roleSync = useRole();
   const reglages = useItems<Partial<TypeReglages>>('reglage').find((x) => x.id === ID_REGLAGES);
@@ -55,6 +60,16 @@ export function App() {
 
   useEffect(() => subscribe(() => setNeedLogin(getState().needLogin)), []);
   useEffect(() => (user ? startAutoSync() : undefined), [user]);
+  // le code PIN se redemande quand on revient sur l'application après 2 minutes
+  useEffect(() => {
+    let parti = 0;
+    const f = () => {
+      if (document.visibilityState === 'hidden') parti = Date.now();
+      else if (parti && Date.now() - parti > 120_000 && pinDefini()) setVerrouille(true);
+    };
+    document.addEventListener('visibilitychange', f);
+    return () => document.removeEventListener('visibilitychange', f);
+  }, []);
 
   if (!user || needLogin) {
     return (
@@ -69,6 +84,8 @@ export function App() {
       />
     );
   }
+
+  if (verrouille && pinDefini()) return <Verrou onOuvert={() => setVerrouille(false)} />;
 
   if (!pret) return <main class="contenu"><p class="intro">Chargement…</p></main>;
 
@@ -99,6 +116,8 @@ export function App() {
   else if (route === '/sauvegarde') page = <Sauvegarde />;
   else if (route === '/rapports') page = <Rapports />;
   else if (route === '/mdp') page = <MotDePasse />;
+  else if (route === '/notifications') page = <Notifications />;
+  else if (route === '/pin') page = <Pin />;
   else page = <Accueil />;
 
   const actif = (p: string) =>

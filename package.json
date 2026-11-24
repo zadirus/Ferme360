@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && tsc --noEmit -p worker/tsconfig.json && vite build",
+    "build": "tsc --noEmit && tsc --noEmit -p worker/tsconfig.json && tsc --noEmit -p sw/tsconfig.json && vite build",
     "preview": "vite preview",
     "test": "vitest run"
   },
@@ -19,6 +19,9 @@
     "vite": "^5.4.0",
     "vite-plugin-pwa": "^0.20.0",
     "vitest": "^2.1.9",
+    "workbox-core": "^7.4.1",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1",
     "wrangler": "^4.168.0"
   }
 }

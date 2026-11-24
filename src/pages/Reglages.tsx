@@ -13,7 +13,9 @@ const CHAMPS: Array<[keyof TypeReglages, string, string]> = [
   ['joursCreance', 'Alerte pour une créance client ancienne de', 'jours'],
   ['poidsOeufG', 'Poids moyen d’un œuf (indice de consommation)', 'g'],
   ['gestationOvin', 'Gestation de la brebis (mise bas prévue)', 'jours'],
-  ['gestationBovin', 'Gestation de la vache (mise bas prévue)', 'jours']
+  ['gestationBovin', 'Gestation de la vache (mise bas prévue)', 'jours'],
+  ['heureNotif', 'Heure des notifications du matin (0 à 23)', 'h'],
+  ['decalageUtc', 'Décalage horaire de la ferme (0 en Côte d’Ivoire et au Sénégal, 1 au Bénin et au Cameroun)', 'h']
 ];
 
 export function Reglages() {
@@ -25,7 +27,7 @@ export function Reglages() {
 
   async function enregistrer(e: Event) {
     e.preventDefault();
-    const data = Object.fromEntries(CHAMPS.map(([k]) => [k, Math.max(0, nombre(valeurs[k]))]));
+    const data = Object.fromEntries(CHAMPS.map(([k]) => [k, k === 'decalageUtc' ? Math.max(-12, Math.min(14, nombre(valeurs[k]))) : k === 'heureNotif' ? Math.max(0, Math.min(23, Math.round(nombre(valeurs[k])))) : Math.max(0, nombre(valeurs[k]))]));
     await saveRecord('reglage', ID_REGLAGES, data);
     setMessage('Réglages enregistrés. Ils s’appliquent à tous les téléphones.');
   }
@@ -44,7 +46,7 @@ export function Reglages() {
       {message && <p class="succes" role="status">{message}</p>}
       <form class="formulaire" onSubmit={enregistrer}>
         {CHAMPS.map(([k, label, unite]) => (
-          <Champ key={k} label={label} type="number" min={0} value={valeurs[k]} onChange={(v) => setValeurs({ ...valeurs, [k]: v })} suffixe={unite} />
+          <Champ key={k} label={label} type="number" min={k === 'decalageUtc' ? -12 : 0} value={valeurs[k]} onChange={(v) => setValeurs({ ...valeurs, [k]: v })} suffixe={unite} />
         ))}
         <Boutons texte="Enregistrer" />
       </form>

@@ -9,5 +9,6 @@
   },
   "d1_databases": [
     { "binding": "DB", "database_name": "ferme360-db" }
-  ]
+  ],
+  "triggers": { "crons": ["0 * * * *"] }
 }

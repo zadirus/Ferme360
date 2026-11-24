@@ -9,6 +9,8 @@ export interface Reglages {
   poidsOeufG: number; // pour l'indice de consommation
   gestationOvin: number;
   gestationBovin: number;
+  heureNotif: number; // heure locale d'envoi des notifications du matin
+  decalageUtc: number; // décalage horaire de la ferme par rapport à l'heure UTC (0 en Côte d'Ivoire et au Sénégal, +1 au Bénin et au Cameroun)
 }
 
 export const DEFAUTS: Reglages = {
@@ -20,7 +22,9 @@ export const DEFAUTS: Reglages = {
   joursCreance: 30,
   poidsOeufG: 60,
   gestationOvin: 150,
-  gestationBovin: 283
+  gestationBovin: 283,
+  heureNotif: 6,
+  decalageUtc: 0
 };
 
 export const REGLAGES: Reglages = { ...DEFAUTS };
@@ -30,7 +34,7 @@ export function appliquerReglages(r: Partial<Reglages>) {
   Object.assign(REGLAGES, DEFAUTS);
   for (const k of Object.keys(DEFAUTS) as Array<keyof Reglages>) {
     const v = r[k];
-    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) REGLAGES[k] = v;
+    if (typeof v === 'number' && Number.isFinite(v) && (v >= 0 || k === 'decalageUtc')) REGLAGES[k] = v;
   }
 }
 

@@ -124,3 +124,11 @@ label.fichier input { display: none; }
 details summary { color: var(--gris); cursor: pointer; font-size: .85rem; }
 button.lien.vert { color: var(--vert); font-weight: 600; }
 a.avatar { text-decoration: none; }
+.verrou { text-align: center; }
+.points { display: flex; gap: 14px; justify-content: center; margin: 16px 0; }
+.points span { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--vert); }
+.points span.plein { background: var(--vert); }
+.centre { text-align: center; }
+.clavier { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 300px; margin: 18px auto; }
+.clavier button { height: 68px; font-size: 1.6rem; font-weight: 700; border-radius: 18px; border: 0; background: #fff; box-shadow: var(--ombre); color: var(--vert-fonce); }
+.clavier button.vide { background: transparent; box-shadow: none; color: var(--gris); }

@@ -54,3 +54,10 @@ Avant de livrer : `npm run build` doit passer.
 - Téléphone partagé : se connecter avec un autre nom vide les données locales (refusé s'il reste des saisies non envoyées).
 - Tests : `npm test` ; `e2e/droits-api.cjs` (API), `e2e/etape4.cjs`, `etape5.cjs`, `etape6.cjs` (deux serveurs : `BASE` et `BASE2`).
 - Non fait : notifications téléphone application fermée, tâches et présences du personnel, sauvegarde automatique vers R2.
+
+## Notifications et code PIN (étape 7, lot 1)
+- Notifications push : `src/push/chiffrement.ts` (RFC 8291 + VAPID, WebCrypto seul, validé avec l'exemple officiel de la RFC), serveur dans `worker/index.ts` (`/api/push/*`, tâche planifiée `scheduled` toutes les heures, qui n'envoie que si l'heure locale = `heureNotif` et une seule fois par jour grâce à `settings.resume_envoye`). Clés VAPID générées et gardées en base (`settings.vapid_*`), rien à configurer dans Cloudflare.
+- Contenu : `src/alertes.ts` (partagé) ; catégories par profil (`CATEGORIES_ROLE`) ; l'abonnement garde les catégories choisies sur chaque téléphone (`push_subs.prefs`).
+- Service worker : `sw/sw.ts` (injectManifest : précache hors-ligne + `push` + `notificationclick`).
+- Code PIN local : `src/pin.ts`, `src/Verrou.tsx`, `src/pages/Pin.tsx` ; redemandé après 2 minutes hors de l'écran ; 5 erreurs = déconnexion.
+- Tests : `src/push/*.test.ts`, `src/alertes.test.ts`, `src/pin.test.ts` ; `e2e/push.cjs` (faux service de push qui déchiffre ; `wrangler dev --test-scheduled`, déclencheur `/cdn-cgi/handler/scheduled?cron=…`), `e2e/pin-hors-ligne.cjs`.

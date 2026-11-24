@@ -1,6 +1,9 @@
 // API Ferme360 : connexion et synchronisation hors-ligne (Cloudflare Workers + D1)
 
-import { collectionsLisibles, peutEcrire, ROLES_CREABLES } from '../src/droits';
+import { CATEGORIES_ROLE, construireAlertes, resumeNotification, type CategorieNotif, type DonneesAlertes } from '../src/alertes';
+import { collectionsLisibles, peutEcrire, ROLES_CREABLES, type Role } from '../src/droits';
+import { chiffrerPush, genererCleVapid, jetonVapid } from '../src/push/chiffrement';
+import { appliquerReglages, ID_REGLAGES, REGLAGES } from '../src/reglages';
 
 interface Env {
   DB: D1Database;
@@ -50,6 +53,13 @@ const SCHEMA = [
      at INTEGER NOT NULL,
      before TEXT NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS journal_at ON journal(at)`,
+  `CREATE TABLE IF NOT EXISTS push_subs (
+     endpoint TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL,
+     p256dh TEXT NOT NULL,
+     auth TEXT NOT NULL,
+     prefs TEXT NOT NULL,
+     created_at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS records_seq ON records(seq)`,
   `CREATE INDEX IF NOT EXISTS records_collection ON records(collection)`
 ];
@@ -428,7 +438,146 @@ async function journal(url: URL, env: Env): Promise<Response> {
   });
 }
 
+// ---------- notifications du matin ----------
+
+async function reglage(db: D1Database, cle: string): Promise<string | null> {
+  return (await db.prepare(`SELECT value FROM settings WHERE key=?`).bind(cle).first<{ value: string }>())?.value ?? null;
+}
+
+async function cleVapid(db: D1Database): Promise<{ privee: JsonWebKey; publique: string }> {
+  let priv = await reglage(db, 'vapid_private');
+  if (!priv) {
+    const k = await genererCleVapid();
+    await db.batch([
+      db.prepare(`INSERT OR IGNORE INTO settings(key,value) VALUES ('vapid_private', ?)`).bind(JSON.stringify(k.privee)),
+      db.prepare(`INSERT OR IGNORE INTO settings(key,value) VALUES ('vapid_public', ?)`).bind(k.publique)
+    ]);
+    priv = await reglage(db, 'vapid_private');
+  }
+  return { privee: JSON.parse(priv!) as JsonWebKey, publique: (await reglage(db, 'vapid_public'))! };
+}
+
+interface Abonnement { endpoint: string; user_id: string; p256dh: string; auth: string; prefs: string }
+
+async function envoyerPush(db: D1Database, sub: Abonnement, charge: object): Promise<'ok' | 'mort' | 'erreur'> {
+  try {
+    const cles = await cleVapid(db);
+    const jwt = await jetonVapid(new URL(sub.endpoint).origin, (await reglage(db, 'origin')) ?? 'https://ferme360.invalid', cles.privee, Math.floor(Date.now() / 1000) + 12 * 3600);
+    const corps = await chiffrerPush(enc.encode(JSON.stringify(charge)), sub.p256dh, sub.auth);
+    const r = await fetch(sub.endpoint, {
+      method: 'POST',
+      headers: { Authorization: `vapid t=${jwt}, k=${cles.publique}`, 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '86400', Urgency: 'normal' },
+      body: corps
+    });
+    return r.status === 404 || r.status === 410 ? 'mort' : r.ok ? 'ok' : 'erreur';
+  } catch (e) {
+    console.error('push', e);
+    return 'erreur';
+  }
+}
+
+async function donneesAlertes(db: D1Database): Promise<DonneesAlertes> {
+  const r = await db.prepare(`SELECT id,collection,data,updated_at FROM records WHERE deleted=0`).all<{ id: string; collection: string; data: string; updated_at: number }>();
+  const par = new Map<string, unknown[]>();
+  for (const x of r.results) {
+    if (x.collection === 'reglage' && x.id === ID_REGLAGES) appliquerReglages(JSON.parse(x.data));
+    const liste = par.get(x.collection) ?? [];
+    liste.push({ ...JSON.parse(x.data), id: x.id, updatedAt: x.updated_at });
+    par.set(x.collection, liste);
+  }
+  const g = (c: string) => (par.get(c) ?? []) as never[];
+  return {
+    bandes: g('bande'), ramassages: g('ramassage'), mortalites: g('mortalite'), santes: g('sante'), animaux: g('animal'), mvtsAnimaux: g('mvt_animal'),
+    repro: g('repro'), misesBas: g('misebas'), soins: g('soin'), articles: g('article'), stockMvts: g('stock_mvt'), ventes: g('vente'),
+    paiements: g('paiement'), clients: g('client')
+  };
+}
+
+// Envoie à chaque téléphone abonné les alertes de son profil, selon ses choix. `test` : envoi immédiat à un seul utilisateur.
+async function envoyerResume(env: Env, aujourdhui: string, userId?: string): Promise<{ envoyes: number; alertes: number }> {
+  const d = await donneesAlertes(env.DB);
+  const toutes = construireAlertes(d, aujourdhui);
+  const subs = (
+    await env.DB.prepare(`SELECT s.endpoint,s.user_id,s.p256dh,s.auth,s.prefs,u.role FROM push_subs s JOIN users u ON u.id=s.user_id WHERE u.active=1${userId ? ' AND s.user_id=?' : ''}`)
+      .bind(...(userId ? [userId] : []))
+      .all<Abonnement & { role: string }>()
+  ).results;
+  let envoyes = 0;
+  for (const sub of subs) {
+    const permises = CATEGORIES_ROLE[sub.role as Role] ?? [];
+    const choisies = JSON.parse(sub.prefs) as CategorieNotif[];
+    const alertes = toutes.filter((a) => permises.includes(a.categorie) && choisies.includes(a.categorie));
+    if (!alertes.length && !userId) continue;
+    const msg = alertes.length ? resumeNotification(alertes) : { titre: 'Ferme360 : test', corps: 'Les notifications fonctionnent sur ce téléphone. Rien à signaler aujourd’hui.' };
+    const etat = await envoyerPush(env.DB, sub, { title: msg.titre, body: msg.corps, url: '/#/', tag: 'ferme360-resume' });
+    if (etat === 'ok') envoyes++;
+    if (etat === 'mort') await env.DB.prepare(`DELETE FROM push_subs WHERE endpoint=?`).bind(sub.endpoint).run();
+  }
+  return { envoyes, alertes: toutes.length };
+}
+
+async function resumeDuMatin(env: Env): Promise<void> {
+  await ensureSchema(env.DB);
+  const stocke = await env.DB.prepare(`SELECT data FROM records WHERE id=? AND deleted=0`).bind(ID_REGLAGES).first<{ data: string }>();
+  appliquerReglages(stocke ? JSON.parse(stocke.data) : {});
+  const local = new Date(Date.now() + REGLAGES.decalageUtc * 3_600_000);
+  if (local.getUTCHours() !== Math.round(REGLAGES.heureNotif)) return;
+  const jour = local.toISOString().slice(0, 10);
+  if ((await reglage(env.DB, 'resume_envoye')) === jour) return;
+  await env.DB.prepare(`INSERT INTO settings(key,value) VALUES ('resume_envoye', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).bind(jour).run();
+  await envoyerResume(env, jour);
+}
+
+function endpointPermis(e: string): boolean {
+  try {
+    const u = new URL(e);
+    return u.protocol === 'https:' || (u.protocol === 'http:' && (u.hostname === 'localhost' || u.hostname === '127.0.0.1'));
+  } catch {
+    return false;
+  }
+}
+
+async function routePush(req: Request, url: URL, env: Env, session: Session): Promise<Response | null> {
+  const route = `${req.method} ${url.pathname}`;
+  if (route === 'GET /api/push/key') return json({ publicKey: (await cleVapid(env.DB)).publique });
+  const b = req.method === 'POST' ? await readBody(req) : null;
+  const permises = CATEGORIES_ROLE[session.role as Role] ?? [];
+  const nettoie = (p: unknown) => (Array.isArray(p) ? p.filter((x): x is CategorieNotif => permises.includes(x as CategorieNotif)) : permises);
+  if (route === 'POST /api/push/subscribe') {
+    const keys = (b?.keys ?? {}) as { p256dh?: string; auth?: string };
+    const endpoint = String(b?.endpoint ?? '');
+    if (!endpointPermis(endpoint) || !keys.p256dh || !keys.auth) return fail(400, 'Abonnement invalide.');
+    const n = await env.DB.prepare(`SELECT COUNT(*) AS n FROM push_subs WHERE user_id=? AND endpoint<>?`).bind(session.uid, endpoint).first<{ n: number }>();
+    if ((n?.n ?? 0) >= 10) return fail(400, 'Trop de téléphones abonnés pour ce compte.');
+    await env.DB.prepare(
+      `INSERT INTO push_subs(endpoint,user_id,p256dh,auth,prefs,created_at) VALUES (?,?,?,?,?,?)
+       ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id, p256dh=excluded.p256dh, auth=excluded.auth, prefs=excluded.prefs`
+    ).bind(endpoint, session.uid, keys.p256dh, keys.auth, JSON.stringify(nettoie(b?.prefs)), Date.now()).run();
+    await env.DB.prepare(`INSERT INTO settings(key,value) VALUES ('origin', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).bind(url.origin).run();
+    return json({ ok: true });
+  }
+  if (route === 'POST /api/push/prefs') {
+    await env.DB.prepare(`UPDATE push_subs SET prefs=? WHERE endpoint=? AND user_id=?`).bind(JSON.stringify(nettoie(b?.prefs)), String(b?.endpoint ?? ''), session.uid).run();
+    return json({ ok: true });
+  }
+  if (route === 'POST /api/push/unsubscribe') {
+    await env.DB.prepare(`DELETE FROM push_subs WHERE endpoint=? AND user_id=?`).bind(String(b?.endpoint ?? ''), session.uid).run();
+    return json({ ok: true });
+  }
+  if (route === 'POST /api/push/test') {
+    const stocke = await env.DB.prepare(`SELECT data FROM records WHERE id=? AND deleted=0`).bind(ID_REGLAGES).first<{ data: string }>();
+    appliquerReglages(stocke ? JSON.parse(stocke.data) : {});
+    const r = await envoyerResume(env, new Date(Date.now() + REGLAGES.decalageUtc * 3_600_000).toISOString().slice(0, 10), session.uid);
+    return json(r);
+  }
+  return null;
+}
+
 export default {
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(resumeDuMatin(env).catch((e) => console.error('résumé du matin', e)));
+  },
+
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     if (!url.pathname.startsWith('/api/')) return fail(404, 'Introuvable.');
@@ -446,6 +595,10 @@ export default {
       if (route === 'GET /api/me') return json({ user: { name: session.name, role: session.role } });
       if (route === 'POST /api/sync') return await sync(req, env, session);
       if (route === 'POST /api/password') return await changerMotDePasse(req, env, session);
+      if (url.pathname.startsWith('/api/push/')) {
+        const r = await routePush(req, url, env, session);
+        if (r) return r;
+      }
       if (url.pathname === '/api/users' || url.pathname === '/api/users/update' || url.pathname === '/api/journal') {
         if (session.role !== 'owner') return fail(403, 'Réservé au propriétaire.');
         if (route === 'GET /api/users') return await listeComptes(env);
