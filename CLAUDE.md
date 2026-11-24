@@ -11,5 +11,5 @@ Avant de livrer : `npm run build` doit passer.
 - Enregistrements génériques `{id, collection, data, updatedAt}` ; la dernière modification gagne, horloge corrigée avec l'heure du serveur.
 - Stocks et effectifs : toujours des mouvements ajoutés, jamais modifiés (à respecter dans les étapes suivantes).
 - Connexion : nom + mot de passe (PBKDF2), jeton signé 90 jours.
-- Installation protégée par le secret `SETUP_CODE` (défini dans le tableau de bord Cloudflare, jamais dans le dépôt ; en local : fichier `.dev.vars`, ignoré par git). Sans ce secret, l'installation est refusée.
+- Installation protégée par le secret `SETUP_CODE` (défini dans le tableau de bord Cloudflare, jamais dans le dépôt ; en local : fichier `.dev.vars`, ignoré par git). Sans ce secret, l'installation reste ouverte jusqu'à la création du compte propriétaire, puis se ferme définitivement (choix explicite du propriétaire, 24/11/2026).
 - Droits par profil : à faire à l'étape 6 ; pour l'instant seul le propriétaire existe.

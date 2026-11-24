@@ -8,6 +8,7 @@ interface Props {
 
 export function Auth({ onDone, reconnect }: Props) {
   const [configured, setConfigured] = useState<boolean | null>(null);
+  const [needsCode, setNeedsCode] = useState(true);
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
@@ -15,8 +16,11 @@ export function Auth({ onDone, reconnect }: Props) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api<{ configured: boolean }>('/api/status')
-      .then((r) => setConfigured(r.configured))
+    api<{ configured: boolean; needsCode?: boolean }>('/api/status')
+      .then((r) => {
+        setConfigured(r.configured);
+        setNeedsCode(r.needsCode !== false);
+      })
       .catch(() => {
         setConfigured(true);
         setError('Pas de réseau : la première connexion demande internet.');
@@ -29,7 +33,7 @@ export function Auth({ onDone, reconnect }: Props) {
     setError('');
     try {
       const path = configured ? '/api/login' : '/api/setup';
-      const body = configured ? { name, password } : { name, password, code };
+      const body = configured ? { name, password } : { name, password, code: needsCode ? code : '' };
       const r = await api<{ token: string; user: User }>(path, body);
       saveSession(r.token, r.user);
       onDone(r.user);
@@ -55,7 +59,7 @@ export function Auth({ onDone, reconnect }: Props) {
           : 'Première installation : créez le compte du propriétaire.'}
       </p>
       <form onSubmit={submit}>
-        {!configured && (
+        {!configured && needsCode && (
           <label>
             Code d'installation
             <input value={code} onInput={(e) => setCode(e.currentTarget.value)} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck={false} required />
