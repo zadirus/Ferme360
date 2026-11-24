@@ -99,7 +99,12 @@ export function BandeDetail({ id }: { id: string }) {
     ...santes.map((s) => ({
       id: s.id, collection: 'sante', date: s.date, updatedAt: s.updatedAt,
       texte: `${s.type === 'vaccin' ? 'Vaccin' : s.type === 'traitement' ? 'Traitement' : 'Santé'} : ${s.produit}${s.rappel ? ` · rappel le ${fmtDate(s.rappel)}` : ''}`,
-      supprimer: suppr('sante', s)
+      supprimer: async () => {
+        if (!window.confirm('Supprimer cette saisie ? La sortie de stock liée sera annulée.')) return;
+        await saveRecord('sante', s.id, dataOf(s), true);
+        for (const m of stockMvts.filter((x) => x.alimentId === s.id)) await saveRecord('stock_mvt', m.id, dataOf(m), true);
+        setMessage('Saisie supprimée');
+      }
     })),
     ...eaux.map((e) => ({ id: e.id, collection: 'eau', date: e.date, updatedAt: e.updatedAt, texte: `Eau : ${fmtDec(e.litres, 0)} litres`, supprimer: suppr('eau', e) })),
     ...fientes.map((f) => ({ id: f.id, collection: 'fientes', date: f.date, updatedAt: f.updatedAt, texte: `Fientes : ${fmtDec(f.sacs, 0)} sac(s)`, supprimer: suppr('fientes', f) }))
@@ -293,6 +298,10 @@ function AlimentForm({ bandeId, onFini }: FormProps) {
 }
 
 function SanteForm({ bandeId, onFini }: FormProps) {
+  const produitsStock = useItems<Article>('article').filter((a) => a.categorie === 'medicament');
+  const mvtsStock = useItems<StockMvt>('stock_mvt');
+  const [articleId, setArticleId] = useState('');
+  const [qte, setQte] = useState('1');
   const [date, setDate] = useState(today());
   const [type, setType] = useState<Sante['type']>('vaccin');
   const [produit, setProduit] = useState('');
@@ -300,15 +309,26 @@ function SanteForm({ bandeId, onFini }: FormProps) {
   const [rappel, setRappel] = useState('');
   async function envoyer(e: Event) {
     e.preventDefault();
-    if (!produit.trim()) return;
-    await enregistrer('sante', { bandeId, date, type, produit: produit.trim(), note: note.trim(), rappel } satisfies Sante);
+    const article = produitsStock.find((a) => a.id === articleId);
+    const nomProduit = produit.trim() || article?.nom || '';
+    if (!nomProduit) return;
+    const q = article ? nombre(qte) : 0;
+    if (article && q > 0) {
+      const stock = mvtsStock.filter((m) => m.articleId === article.id).reduce((sum, m) => (m.type === 'sortie' ? sum - m.quantite : sum + m.quantite), 0);
+      if (q > stock && !window.confirm(`Le stock de ${article.nom} deviendrait négatif. Continuer ?`)) return;
+    }
+    const santeId = newId();
+    await saveRecord('sante', santeId, { bandeId, date, type, produit: nomProduit, note: note.trim(), rappel } satisfies Sante);
+    if (article && q > 0) await saveRecord('stock_mvt', newId(), { articleId: article.id, date, type: 'sortie', quantite: q, peremption: '', achatId: '', alimentId: santeId, note: `Soin des poules : ${nomProduit}` } satisfies StockMvt);
     onFini('Soin enregistré');
   }
   return (
     <form class="formulaire" onSubmit={envoyer}>
       <h3>Santé</h3>
       <Choix label="Type" value={type} onChange={setType} options={[['vaccin', 'Vaccin'], ['traitement', 'Traitement'], ['autre', 'Autre']]} />
-      <Champ label="Produit ou maladie" value={produit} onChange={setProduit} required placeholder="Ex. : Newcastle" />
+      {produitsStock.length > 0 && <Choix label="Produit pris dans le stock (facultatif)" value={articleId} onChange={setArticleId} options={[['', 'Aucun (produit hors stock)'], ...produitsStock.map((a) => [a.id, a.nom] as [string, string])]} />}
+      {articleId && <Champ label="Quantité utilisée" type="number" min={0} value={qte} onChange={setQte} suffixe={produitsStock.find((a) => a.id === articleId)?.unite} />}
+      <Champ label={articleId ? 'Maladie ou précision (facultatif)' : 'Produit ou maladie'} value={produit} onChange={setProduit} required={!articleId} placeholder="Ex. : Newcastle" />
       <Champ label="Date" type="date" max={today()} value={date} onChange={setDate} required />
       <Champ label="Prochain rappel (facultatif)" type="date" value={rappel} onChange={setRappel} />
       <Champ label="Note (facultatif)" value={note} onChange={setNote} />

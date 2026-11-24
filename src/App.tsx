@@ -9,6 +9,7 @@ import { Equipe, Journal, MotDePasse, Plus } from './pages/Admin';
 import { Rapports } from './pages/Rapports';
 import { Notifications } from './pages/Notifications';
 import { Aide } from './pages/Aide';
+import { Tableau } from './pages/Tableau';
 import { Import } from './pages/Import';
 import { Pin } from './pages/Pin';
 import { pinDefini } from './pin';
@@ -27,15 +28,44 @@ import { Argent } from './pages/Argent';
 import { ArticleDetail, Stocks } from './pages/Stocks';
 import { ClientDetail, Clients, NouvelleVente, Ventes } from './pages/Ventes';
 import { getState, resetNeedLogin, setRole, startAutoSync, subscribe } from './sync';
-import { getToken, getUser, type User } from './session';
+import { deconnexion, getToken, getUser, type User } from './session';
 
+// Téléphone : barre du bas (5 entrées, « Plus » ouvre tout le reste)
 const ONGLETS: Array<[string, string, string]> = [
   ['/', 'Accueil', '🏠'],
   ['/elevage', 'Élevage', '🐾'],
   ['/ventes', 'Ventes', '🧾'],
   ['/stocks', 'Stocks', '📦'],
-  ['/argent', 'Argent', '💰']
+  ['/plus', 'Plus', '☰']
 ];
+
+// Ordinateur : menu latéral complet
+const MENU_BUREAU: Array<{ section?: string; chemin: string; texte: string; icone: string }> = [
+  { chemin: '/', texte: 'Accueil', icone: '🏠' },
+  { chemin: '/tableau', texte: 'Tableau de bord', icone: '📊' },
+  { section: 'Activités', chemin: '/elevage', texte: 'Élevage', icone: '🐾' },
+  { chemin: '/ventes', texte: 'Ventes et clients', icone: '🧾' },
+  { chemin: '/stocks', texte: 'Stocks', icone: '📦' },
+  { chemin: '/argent', texte: 'Argent', icone: '💰' },
+  { chemin: '/rapports', texte: 'Rapports', icone: '📄' },
+  { section: 'Gestion', chemin: '/equipe', texte: 'Équipe et droits', icone: '👥' },
+  { chemin: '/journal', texte: 'Journal', icone: '🕑' },
+  { chemin: '/reglages', texte: 'Réglages', icone: '⚙️' },
+  { chemin: '/import', texte: 'Reprendre mes données', icone: '📥' },
+  { chemin: '/sauvegarde', texte: 'Sauvegarde', icone: '💾' },
+  { section: 'Moi', chemin: '/notifications', texte: 'Notifications', icone: '🔔' },
+  { chemin: '/pin', texte: 'Code PIN', icone: '🔒' },
+  { chemin: '/mdp', texte: 'Mon mot de passe', icone: '🔑' },
+  { chemin: '/carnet', texte: 'Carnet', icone: '📒' },
+  { chemin: '/aide', texte: 'Aide', icone: '❓' }
+];
+
+const FAMILLES: Record<string, string[]> = {
+  '/elevage': ['/elevage', '/poules', '/oeufs', '/moutons', '/boeufs', '/animaux', '/lots'],
+  '/ventes': ['/ventes', '/clients'],
+  '/stocks': ['/stocks'],
+  '/plus': ['/plus', '/argent', '/rapports', '/tableau', '/equipe', '/journal', '/reglages', '/sauvegarde', '/import', '/notifications', '/pin', '/mdp', '/aide', '/carnet']
+};
 
 // Accès aux pages selon le profil (le serveur applique de toute façon les mêmes droits)
 function autorise(route: string, role: string): boolean {
@@ -120,12 +150,13 @@ export function App() {
   else if (route === '/mdp') page = <MotDePasse />;
   else if (route === '/notifications') page = <Notifications />;
   else if (route === '/aide') page = <Aide />;
+  else if (route === '/tableau') page = <Tableau />;
   else if (route === '/import') page = <Import />;
   else if (route === '/pin') page = <Pin />;
   else page = <Accueil />;
 
-  const actif = (p: string) =>
-    p === '/' ? route === '/' : p === '/elevage' ? ['/elevage', '/poules', '/oeufs', '/moutons', '/boeufs', '/animaux', '/lots'].some((x) => route.startsWith(x)) : p === '/ventes' ? route.startsWith('/ventes') || route.startsWith('/clients') : route.startsWith(p);
+  const actif = (p: string) => (p === '/' ? route === '/' : (FAMILLES[p] ?? [p]).some((x) => route.startsWith(x)));
+  const actifBureau = (p: string) => (p === '/' ? route === '/' : (FAMILLES[p] ?? [p]).some((x) => route.startsWith(x)));
 
   return (
     <>
@@ -139,6 +170,16 @@ export function App() {
           <a class="avatar" href="#/plus" title={`${user.name} : menu`}>{user.name.trim().charAt(0).toUpperCase()}</a>
         </div>
       </header>
+      <nav class="menu-bureau" aria-label="Menu principal">
+        {MENU_BUREAU.filter((m) => autorise(m.chemin, role)).map((m) => (
+          <>
+            {m.section && <p class="menu-section">{m.section}</p>}
+            <a key={m.chemin} href={`#${m.chemin}`} class={actifBureau(m.chemin) ? 'actif' : ''}><span class="i" aria-hidden="true">{m.icone}</span>{m.texte}</a>
+          </>
+        ))}
+        <p class="menu-section">{user.name}</p>
+        <button type="button" class="deco" onClick={() => { if (window.confirm('Se déconnecter ?')) { deconnexion(); location.hash = '/'; location.reload(); } }}>⏻ Se déconnecter</button>
+      </nav>
       <main class="contenu">{page}</main>
       <nav class="onglets" aria-label="Navigation">
         {ONGLETS.filter(([chemin]) => autorise(chemin, role)).map(([chemin, texte, icone]) => (

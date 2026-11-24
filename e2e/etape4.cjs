@@ -26,7 +26,7 @@ const futur = (j) => { const d = new Date(); d.setDate(d.getDate() + j); return 
   await P.screenshot({ path: S + '/accueil0.png' });
 
   // solde de départ de la caisse
-  await tab('Argent');
+  await P.goto(BASE + '/#/argent'); await P.waitForTimeout(300);
   await P.getByRole('button', { name: 'Corriger un solde' }).click();
   await P.getByLabel('Solde réel').fill('400000');
   await envoyer('Corriger');
@@ -47,11 +47,11 @@ const futur = (j) => { const d = new Date(); d.setDate(d.getDate() + j); return 
 
   // articles et achats
   await tab('Stocks');
-  await P.getByRole('button', { name: /Nouvel article/ }).click();
+  await P.getByRole('button', { name: /Aliment$/ }).click();
   await P.getByLabel('Nom', { exact: true }).fill('Aliment ponte');
   await P.getByLabel('Alerte quand il en reste').fill('5');
   await envoyer("Créer l'article");
-  await P.getByRole('button', { name: /Nouvel article/ }).click();
+  await P.getByRole('button', { name: /Produit vétérinaire$/ }).click();
   await P.getByLabel('Catégorie').selectOption('medicament');
   await P.getByLabel('Nom', { exact: true }).fill('Vaccin Newcastle');
   await envoyer("Créer l'article");
@@ -120,7 +120,7 @@ const futur = (j) => { const d = new Date(); d.setDate(d.getDate() + j); return 
   ok((await texte('.stat:has-text("à jour")')).includes('0 FCFA'), 'paiement de 8 000 par Mobile Money → client à jour');
 
   // soldes
-  await tab('Argent');
+  await P.goto(BASE + '/#/argent'); await P.waitForTimeout(300);
   await P.waitForFunction(() => document.body.innerText.replace(/[\u202f\u00a0]/g, ' ').includes('72 000'));
   const soldes = norm(await P.locator('.stats').innerText());
   ok(soldes.includes('72 000') && soldes.includes('8 000'), 'caisse 400 000 − 340 000 + 12 000 = 72 000 ; Mobile Money 8 000');
@@ -139,7 +139,7 @@ const futur = (j) => { const d = new Date(); d.setDate(d.getDate() + j); return 
   await B.getByLabel('Nom', { exact: true }).fill('Jacques');
   await B.getByLabel(/Mot de passe/).fill('motdepasse1');
   await B.getByRole('button', { name: 'Se connecter' }).click();
-  await B.locator('.onglets a', { hasText: 'Argent' }).click();
+  await B.goto(BASE + '/#/argent');
   await B.waitForFunction(() => document.body.innerText.replace(/[  ]/g, ' ').includes('72 000'), null, { timeout: 10000 });
   ok(true, 'téléphone B : mêmes soldes (72 000 en caisse)');
 

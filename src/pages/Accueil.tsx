@@ -148,6 +148,13 @@ export function Accueil() {
           </a>
         </li>}
         <li>
+          <a class="tuile t-argent" href="#/tableau">
+            <span class="ico">📊</span>
+            <span class="gros">Tableau de bord</span>
+            <span class="petit">chiffres clés, graphiques</span>
+          </a>
+        </li>
+        <li>
           <a class="tuile" href="#/carnet">
             <span class="ico">📒</span>
             <span class="gros">Carnet</span>

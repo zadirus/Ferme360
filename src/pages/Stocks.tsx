@@ -2,66 +2,105 @@ import { useState } from 'preact/hooks';
 import { dataOf, go, useItems, useRole, type Item } from '../hooks';
 import { peut, peutEcrire } from '../droits';
 import { fmtDate, fmtDec, fmtFcfa, today } from '../format';
-import { alertesArticle, lotsRestants, stockArticle } from '../gestion/calculs';
+import { alertesArticle, coutMoyen, lotsRestants, stockArticle } from '../gestion/calculs';
 import { ACTIVITES, COMPTES, type Achat, type Activite, type Article, type Compte, type Fournisseur, type StockMvt } from '../gestion/types';
 import { newId, saveRecord } from '../sync';
 import { Alertes, Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
 
 const CATEGORIES: Array<[Article['categorie'], string]> = [
   ['aliment', 'Aliment'],
-  ['medicament', 'Médicament / vaccin'],
+  ['medicament', 'Produit vétérinaire (médicament, vaccin)'],
   ['autre', 'Autre']
 ];
+
+export const NOM_CATEGORIE_ARTICLE: Record<Article['categorie'], string> = { aliment: 'Aliments', medicament: 'Produits vétérinaires', autre: 'Autres articles' };
+export const ICONE_CATEGORIE_ARTICLE: Record<Article['categorie'], string> = { aliment: '🌽', medicament: '💊', autre: '📦' };
 
 export function Stocks() {
   const articles = useItems<Article>('article');
   const mvts = useItems<StockMvt>('stock_mvt');
+  const achats = useItems<Achat>('achat');
   const [mode, setMode] = useState<'article' | 'achat' | null>(null);
+  const [categorieNouvelle, setCategorieNouvelle] = useState<Article['categorie']>('aliment');
+  const [filtre, setFiltre] = useState<'tous' | Article['categorie']>('tous');
   const [message, setMessage] = useState('');
   const role = useRole();
+  const argent = peut(role, 'argent');
   const fini = (m: string) => { setMode(null); setMessage(m); };
   const mvtsDe = (id: string) => mvts.filter((m) => m.articleId === id);
   const alertes = articles.flatMap((a) => alertesArticle(a, mvtsDe(a.id), today()));
+  const categories: Array<Article['categorie']> = ['aliment', 'medicament', 'autre'];
+  const nb = (c: Article['categorie']) => articles.filter((a) => a.categorie === c).length;
+  const valeur = articles.reduce((s, a) => s + Math.max(0, stockArticle(mvtsDe(a.id))) * coutMoyen(a.id, achats), 0);
+  const nouveau = (c: Article['categorie']) => { setCategorieNouvelle(c); setMode('article'); };
+
+  const carte = (a: Item<Article>) => {
+    const stock = stockArticle(mvtsDe(a.id));
+    const al = alertesArticle(a, mvtsDe(a.id), today());
+    const proche = lotsRestants(mvtsDe(a.id)).filter((l) => l.peremption).sort((x, y) => x.peremption.localeCompare(y.peremption))[0];
+    return (
+      <li key={a.id}>
+        <a class="carte" href={`#/stocks/${a.id}`}>
+          <strong>{ICONE_CATEGORIE_ARTICLE[a.categorie]} {a.nom}</strong>
+          <span>
+            {fmtDec(stock, stock % 1 ? 1 : 0)} {a.unite}
+            {a.seuil > 0 ? ` · alerte à ${a.seuil}` : ''}
+            {proche ? ` · périme le ${fmtDate(proche.peremption)}` : ''}
+          </span>
+          {al.length > 0 && <span class="alerte-mini">⚠ {al.length} alerte(s)</span>}
+        </a>
+      </li>
+    );
+  };
 
   return (
     <section>
       <h2>Stocks</h2>
-      <p class="intro">Aliments et médicaments : entrées par les achats, sorties par l'alimentation des bandes ou à la main.</p>
+      <p class="intro">Aliments, produits vétérinaires et autres articles. Les entrées viennent des achats ; les sorties, de l'alimentation des animaux, des soins ou d'une saisie à la main.</p>
       <Alertes liste={alertes} />
       {message && <p class="succes" role="status">{message}</p>}
-      {!mode && peut(role, 'achats') && (
+      <div class="stats">
+        <Stat valeur={articles.length} label="articles suivis" />
+        {categories.map((c) => <Stat key={c} valeur={nb(c)} label={`${ICONE_CATEGORIE_ARTICLE[c]} ${NOM_CATEGORIE_ARTICLE[c].toLowerCase()}`} />)}
+        {argent && valeur > 0 && <Stat valeur={fmtFcfa(valeur)} label="Valeur du stock (au coût moyen d'achat)" />}
+      </div>
+      {!mode && (
         <div class="actions">
-          <button class="principal" type="button" onClick={() => setMode('achat')}><span class="e">🛒</span>Nouvel achat</button>
-          <button class="principal" type="button" onClick={() => setMode('article')}><span class="e">📦</span>Nouvel article</button>
+          {peut(role, 'achats') && <button class="principal" type="button" onClick={() => setMode('achat')}><span class="e">🛒</span>Nouvel achat</button>}
+          {peutEcrire(role, 'article') && <button class="principal" type="button" onClick={() => nouveau('medicament')}><span class="e">💊</span>Produit vétérinaire</button>}
+          {peutEcrire(role, 'article') && <button class="principal" type="button" onClick={() => nouveau('aliment')}><span class="e">🌽</span>Aliment</button>}
+          {peutEcrire(role, 'article') && <button class="secondaire" type="button" onClick={() => nouveau('autre')}>Autre article</button>}
         </div>
       )}
-      {mode === 'article' && <ArticleForm onFini={fini} />}
+      {mode === 'article' && <ArticleForm categorieInitiale={categorieNouvelle} onFini={fini} />}
       {mode === 'achat' && <AchatForm onFini={fini} />}
-      <h3>Articles en stock</h3>
-      <ul>
-        {articles.map((a) => {
-          const stock = stockArticle(mvtsDe(a.id));
-          const al = alertesArticle(a, mvtsDe(a.id), today());
-          return (
-            <li key={a.id}>
-              <a class="carte" href={`#/stocks/${a.id}`}>
-                <strong>{a.nom}</strong>
-                <span>{fmtDec(stock, stock % 1 ? 1 : 0)} {a.unite}{a.seuil > 0 ? ` · alerte à ${a.seuil}` : ''}</span>
-                {al.length > 0 && <span class="alerte-mini">⚠ {al.length} alerte(s)</span>}
-              </a>
-            </li>
-          );
-        })}
-        {articles.length === 0 && !mode && <li class="vide">Aucun article. Créez « Aliment ponte » ou un vaccin.</li>}
-      </ul>
+
+      <div class="puces">
+        <button type="button" class={filtre === 'tous' ? 'actif' : ''} onClick={() => setFiltre('tous')}>Tous ({articles.length})</button>
+        {categories.map((c) => <button key={c} type="button" class={filtre === c ? 'actif' : ''} onClick={() => setFiltre(c)}>{ICONE_CATEGORIE_ARTICLE[c]} {NOM_CATEGORIE_ARTICLE[c]} ({nb(c)})</button>)}
+      </div>
+
+      {categories.filter((c) => filtre === 'tous' || filtre === c).map((c) => (
+        <div key={c}>
+          <h3>{ICONE_CATEGORIE_ARTICLE[c]} {NOM_CATEGORIE_ARTICLE[c]}</h3>
+          <ul>
+            {articles.filter((a) => a.categorie === c).sort((x, y) => x.nom.localeCompare(y.nom, 'fr')).map(carte)}
+            {nb(c) === 0 && !mode && (
+              <li class="vide">
+                {c === 'medicament' ? 'Aucun produit vétérinaire. Ajoutez vos vaccins et médicaments : leur stock baissera à chaque soin, et la péremption sera surveillée.' : c === 'aliment' ? 'Aucun aliment en stock.' : 'Aucun autre article.'}
+              </li>
+            )}
+          </ul>
+        </div>
+      ))}
     </section>
   );
 }
 
-function ArticleForm({ onFini }: { onFini: (m: string) => void }) {
+function ArticleForm({ onFini, categorieInitiale = 'aliment' }: { onFini: (m: string) => void; categorieInitiale?: Article['categorie'] }) {
   const [nom, setNom] = useState('');
-  const [unite, setUnite] = useState('sac');
-  const [categorie, setCategorie] = useState<Article['categorie']>('aliment');
+  const [unite, setUnite] = useState(categorieInitiale === 'aliment' ? 'sac' : categorieInitiale === 'medicament' ? 'flacon' : 'unité');
+  const [categorie, setCategorie] = useState<Article['categorie']>(categorieInitiale);
   const [seuil, setSeuil] = useState('');
   const [kg, setKg] = useState('50');
   async function envoyer(e: Event) {
@@ -161,7 +200,7 @@ export function ArticleDetail({ id }: { id: string }) {
   const lots = lotsRestants(mvts).filter((l) => l.peremption);
   const liste = [...mvts].sort((x, y) => y.date.localeCompare(x.date) || y.updatedAt - x.updatedAt).slice(0, 40);
   const fini = (m: string) => { setMode(null); setMessage(m); };
-  const libelle = (m: StockMvt) => m.type === 'entree' ? 'Entrée' : m.type === 'sortie' ? (m.alimentId ? 'Aliment distribué' : 'Sortie') : 'Ajustement d’inventaire';
+  const libelle = (m: StockMvt) => m.type === 'entree' ? 'Entrée' : m.type === 'sortie' ? (m.alimentId ? (a.categorie === 'medicament' ? 'Utilisé pour un soin' : 'Aliment distribué') : 'Sortie') : 'Ajustement d’inventaire';
 
   return (
     <section>

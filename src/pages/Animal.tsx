@@ -6,7 +6,7 @@ import { COMPTES, type Compte, type Depense, type Paiement, type Vente } from '.
 import { CroissanceAnimal, fmtLitres, litresSur, PhotosAnimal, supprimerTravail, TraiteForm, TravailForm } from './RuminantsExtras';
 import { dernierPoids, finDelaiAttente, gmq, gmqAnimal, margeAnimal, miseBasPrevue, poidsAnimal } from '../ruminants/calculs';
 import { coutDistribution } from '../gestion/calculs';
-import type { Article } from '../gestion/types';
+import type { Article, StockMvt } from '../gestion/types';
 import { libelleAnimal, useRuminants } from '../ruminants/donnees';
 import {
   ACTIVITE_ESPECE, ICONE_ESPECE, NOM_ESPECE, NOM_SOIN,
@@ -25,6 +25,7 @@ export function AnimalDetail({ id }: { id: string }) {
   const [action, setAction] = useState<Action | null>(null);
   const [message, setMessage] = useState('');
   const articlesT = useItems<Article>('article');
+  const stockMvtsT = useItems<StockMvt>('stock_mvt');
   const ventesT = useItems<Vente>('vente');
   const paiementsT = useItems<Paiement>('paiement');
   const role = useRole();
@@ -56,7 +57,7 @@ export function AnimalDetail({ id }: { id: string }) {
   const evts: Evt[] = [
     ...r.pesees.filter((p) => p.animalId === id).map((p) => ({ cle: 'p' + p.id, date: p.date, maj: p.updatedAt, texte: `Pesée : ${fmtDec(p.poids, 1)} kg (${p.methode === 'balance' ? 'balance' : 'ruban'})`, supprimer: () => effacer('pesee', p, 'Supprimer cette pesée ?') })),
     ...r.soins.filter((s) => s.animalId === id).map((s) => ({ cle: 's' + s.id, date: s.date, maj: s.updatedAt, texte: `${NOM_SOIN[s.type]} : ${s.produit}${s.delaiAttente ? ` · délai d'attente ${s.delaiAttente} j` : ''}${s.cout ? ` · ${fmtFcfa(s.cout)}` : ''}`,
-      supprimer: () => effacer('soin', s, 'Supprimer ce soin et sa dépense ?', async () => { for (const d of r.depenses.filter((x) => x.soinId === s.id)) await saveRecord('depense', d.id, dataOf(d), true); }) })),
+      supprimer: () => effacer('soin', s, 'Supprimer ce soin, sa dépense et la sortie de stock liée ?', async () => { for (const d of r.depenses.filter((x) => x.soinId === s.id)) await saveRecord('depense', d.id, dataOf(d), true); for (const m of stockMvtsT.filter((x) => x.alimentId === s.id)) await saveRecord('stock_mvt', m.id, dataOf(m), true); }) })),
     ...r.repro.filter((x) => x.femelleId === id).map((x) => ({ cle: 'r' + x.id, date: x.date, maj: x.updatedAt,
       texte: x.type === 'chaleurs' ? 'Chaleurs' : x.type === 'saillie' ? `Saillie${x.maleId ? ` par ${nom(x.maleId)}` : ''}` : `Diagnostic de gestation : ${x.resultat === 'gestante' ? 'gestante' : 'vide'}`,
       supprimer: () => effacer('repro', x, 'Supprimer cette saisie ?') })),
@@ -197,6 +198,10 @@ function PeseeForm({ animalId, onFini }: { animalId: string; onFini: (m: string)
 // Soin d'un animal ou d'un lot ; le coût crée aussi une dépense (activité et trésorerie)
 export function SoinForm({ animalId, lotId, espece, onFini }: { animalId: string; lotId: string; espece: Espece; onFini: (m: string) => void }) {
   const argent = peut(useRole(), 'argent');
+  const produitsStock = useItems<Article>('article').filter((a) => a.categorie === 'medicament');
+  const mvtsStock = useItems<StockMvt>('stock_mvt');
+  const [articleId, setArticleId] = useState('');
+  const [qte, setQte] = useState('1');
   const [type, setType] = useState<Soin['type']>('vaccin');
   const [produit, setProduit] = useState('');
   const [date, setDate] = useState(today());
@@ -208,10 +213,18 @@ export function SoinForm({ animalId, lotId, espece, onFini }: { animalId: string
   const [note, setNote] = useState('');
   async function envoyer(e: Event) {
     e.preventDefault();
-    if (!produit.trim()) return;
+    const article = produitsStock.find((a) => a.id === articleId);
+    const nomProduit = produit.trim() || article?.nom || '';
+    if (!nomProduit) return;
+    const q = article ? nombre(qte) : 0;
+    if (article && q > 0) {
+      const stock = mvtsStock.filter((m) => m.articleId === article.id).reduce((sum, m) => (m.type === 'sortie' ? sum - m.quantite : sum + m.quantite), 0);
+      if (q > stock && !window.confirm(`Le stock de ${article.nom} deviendrait négatif. Continuer ?`)) return;
+    }
     const c = argent ? Math.max(0, nombre(cout)) : 0;
     const soinId = newId();
-    await saveRecord('soin', soinId, { animalId, lotId, date, type, produit: produit.trim(), veterinaire: veto.trim(), cout: c, delaiAttente: Math.max(0, Math.floor(nombre(delai))), rappel, note: note.trim() } satisfies Soin);
+    await saveRecord('soin', soinId, { animalId, lotId, date, type, produit: nomProduit, veterinaire: veto.trim(), cout: c, delaiAttente: Math.max(0, Math.floor(nombre(delai))), rappel, note: note.trim() } satisfies Soin);
+    if (article && q > 0) await saveRecord('stock_mvt', newId(), { articleId: article.id, date, type: 'sortie', quantite: q, peremption: '', achatId: '', alimentId: soinId, note: `Soin : ${nomProduit}` } satisfies StockMvt);
     if (c > 0) {
       await saveRecord('depense', newId(), { date, activite: ACTIVITE_ESPECE[espece], categorie: 'Soins vétérinaires', libelle: `${NOM_SOIN[type]} ${produit.trim()}`, montant: c, compte, soinId } satisfies Depense);
     }
@@ -221,7 +234,9 @@ export function SoinForm({ animalId, lotId, espece, onFini }: { animalId: string
     <form class="formulaire" onSubmit={envoyer}>
       <h3>{lotId ? 'Soin du lot' : 'Soin'}</h3>
       <Choix label="Type" value={type} onChange={setType} options={(Object.keys(NOM_SOIN) as Soin['type'][]).map((k) => [k, NOM_SOIN[k]] as [Soin['type'], string])} />
-      <Champ label="Produit ou maladie" value={produit} onChange={setProduit} required />
+      {produitsStock.length > 0 && <Choix label="Produit pris dans le stock (facultatif)" value={articleId} onChange={setArticleId} options={[['', 'Aucun (produit hors stock)'], ...produitsStock.map((a) => [a.id, a.nom] as [string, string])]} />}
+      {articleId && <Champ label="Quantité utilisée" type="number" min={0} value={qte} onChange={setQte} suffixe={produitsStock.find((a) => a.id === articleId)?.unite} />}
+      <Champ label={articleId ? 'Maladie ou précision (facultatif)' : 'Produit ou maladie'} value={produit} onChange={setProduit} required={!articleId} />
       <Champ label="Date" type="date" max={today()} value={date} onChange={setDate} required />
       <Champ label="Délai d'attente avant vente ou abattage" type="number" min={0} value={delai} onChange={setDelai} suffixe="jours" placeholder="0" />
       <Champ label="Prochain rappel (facultatif)" type="date" value={rappel} onChange={setRappel} />

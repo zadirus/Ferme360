@@ -56,6 +56,7 @@ export function LotDetail({ id }: { id: string }) {
     if (!window.confirm('Supprimer ce soin et sa dépense ?')) return;
     await saveRecord('soin', s.id, dataOf(s), true);
     for (const d of r.depenses.filter((x) => x.soinId === s.id)) await saveRecord('depense', d.id, dataOf(d), true);
+    for (const m of stockMvts.filter((y) => y.alimentId === s.id)) await saveRecord('stock_mvt', m.id, dataOf(m), true);
     setMessage('Soin supprimé');
   };
 

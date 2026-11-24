@@ -95,6 +95,7 @@ export function Auth({ onDone, reconnect }: Props) {
           />
         </label>
         {error && <p class="erreur">{error}</p>}
+        {configured && <p class="intro">Un compte par personne, créé par le propriétaire. Mot de passe oublié ? Le propriétaire peut le changer dans Plus, Équipe. Après 5 erreurs, le compte est bloqué 5 minutes.</p>}
         <button class="principal" type="submit" disabled={busy}>
           {configured ? 'Se connecter' : "Créer l'installation"}
         </button>
