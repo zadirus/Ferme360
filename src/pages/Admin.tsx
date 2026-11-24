@@ -97,6 +97,7 @@ export function Equipe() {
   const [message, setMessage] = useState('');
   const [creation, setCreation] = useState(false);
   const [reset, setReset] = useState<string | null>(null);
+  const [renomme, setRenomme] = useState<string | null>(null);
 
   const charger = async () => {
     try {
@@ -115,6 +116,7 @@ export function Equipe() {
       await api('/api/users/update', corps);
       setMessage(ok);
       setReset(null);
+      setRenomme(null);
       await charger();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Erreur');
@@ -144,7 +146,9 @@ export function Equipe() {
                 <button type="button" class="lien" onClick={() => void agir({ id: c.id, active: !c.active }, c.active ? 'Compte désactivé' : 'Compte réactivé')}>
                   {c.active ? 'Désactiver ce compte' : 'Réactiver ce compte'}
                 </button>
-                <button type="button" class="lien" onClick={() => setReset(reset === c.id ? null : c.id)}>Changer son mot de passe</button>
+                <button type="button" class="lien" onClick={() => { setRenomme(renomme === c.id ? null : c.id); setReset(null); }}>Changer son nom</button>
+                {renomme === c.id && <NomForm depart={c.name} onValider={(n) => agir({ id: c.id, name: n }, 'Nom modifié')} />}
+                <button type="button" class="lien" onClick={() => { setReset(reset === c.id ? null : c.id); setRenomme(null); }}>Changer son mot de passe</button>
                 {reset === c.id && <ResetForm onValider={(p) => agir({ id: c.id, password: p }, 'Mot de passe changé')} />}
               </>
             )}
@@ -154,6 +158,16 @@ export function Equipe() {
       </ul>
       <p class="intro">Un compte désactivé est coupé tout de suite. Les données déjà présentes sur son téléphone y restent : récupérez le téléphone si nécessaire.</p>
     </section>
+  );
+}
+
+function NomForm({ depart, onValider }: { depart: string; onValider: (n: string) => Promise<void> }) {
+  const [n, setN] = useState(depart);
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); void onValider(n); }}>
+      <label>Nouveau nom<input value={n} onInput={(e) => setN(e.currentTarget.value)} minLength={2} required /></label>
+      <button class="secondaire" type="submit">Enregistrer ce nom</button>
+    </form>
   );
 }
 

@@ -410,6 +410,14 @@ async function modifierCompte(req: Request, env: Env, session: Session): Promise
     if (!ROLES_CREABLES.some(([r]) => r === b.role)) return fail(400, 'Profil inconnu.');
     await env.DB.prepare(`UPDATE users SET role=? WHERE id=?`).bind(b.role, id).run();
   }
+  if (typeof b?.name === 'string') {
+    const nom = b.name.trim().replace(/\s+/g, ' ');
+    if (u.role === 'owner') return fail(400, 'Le nom du propriétaire ne peut pas être changé.');
+    if (nom.length < 2 || nom.length > 60) return fail(400, 'Le nom doit avoir entre 2 et 60 caractères.');
+    const pris = await env.DB.prepare(`SELECT id FROM users WHERE name=? COLLATE NOCASE AND id<>?`).bind(nom, id).first();
+    if (pris) return fail(409, 'Ce nom est déjà utilisé.');
+    await env.DB.prepare(`UPDATE users SET name=? WHERE id=?`).bind(nom, id).run();
+  }
   if (typeof b?.active === 'boolean') await env.DB.prepare(`UPDATE users SET active=? WHERE id=?`).bind(b.active ? 1 : 0, id).run();
   if (typeof b?.password === 'string' && b.password !== '') {
     if (b.password.length < 8) return fail(400, 'Le mot de passe doit avoir au moins 8 caractères.');
