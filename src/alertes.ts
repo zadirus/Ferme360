@@ -3,8 +3,9 @@ import type { Role } from './droits';
 import { ajouteJours, fmtDate, joursEntre } from './format';
 import { alertesArticle, creances } from './gestion/calculs';
 import type { Article, Client, Paiement, StockMvt, Vente } from './gestion/types';
-import { alertes as alertesPoules } from './poules/calculs';
-import type { Bande, Mortalite, Ramassage, Sante } from './poules/types';
+import { alerteEau, alertes as alertesPoules } from './poules/calculs';
+import { vaccinsAFaire, type LigneProphylaxie } from './poules/programmes';
+import type { Bande, Eau, Mortalite, Ramassage, Sante } from './poules/types';
 import { etatAnimal, finDelaiAttente, miseBasPrevue } from './ruminants/calculs';
 import type { Animal, MiseBas, MvtAnimal, Repro, Soin } from './ruminants/types';
 import { REGLAGES } from './reglages';
@@ -45,6 +46,8 @@ export interface DonneesAlertes {
   ventes: Array<Avec<Vente>>;
   paiements: Array<Avec<Paiement>>;
   clients: Array<Avec<Client>>;
+  programme?: LigneProphylaxie[];
+  eaux?: Array<Avec<Eau>>;
 }
 
 export interface AlerteNotif {
@@ -103,8 +106,15 @@ export function construireAlertes(d: DonneesAlertes, aujourdhui: string): Alerte
     if (c.jours > REGLAGES.joursCreance) out.push({ categorie: 'creances', texte: `${d.clients.find((x) => x.id === c.clientId)?.nom ?? 'Un client'} doit ${Math.round(c.solde).toLocaleString('fr-FR')} FCFA depuis ${c.jours} jours` });
   }
 
+  // vaccins du programme de la ferme, pour chaque bande (en retard, aujourd'hui ou demain)
+  for (const b of d.bandes.filter((x) => !x.cloturee)) {
+    for (const v of vaccinsAFaire(b, d.programme ?? [], d.santes.filter((s) => s.bandeId === b.id), aujourdhui, 1)) out.push({ categorie: 'rappels', texte: `Vaccin ${v.produit} (${b.nom}) : ${quand(v.date)}` });
+  }
+
   // poules
   for (const b of d.bandes.filter((x) => !x.cloturee)) {
+    const e = alerteEau(b, (d.eaux ?? []).filter((x) => x.bandeId === b.id), d.mortalites.filter((m) => m.bandeId === b.id));
+    if (e) out.push({ categorie: 'poules', texte: `${b.nom} : ${e}` });
     for (const texte of alertesPoules(b, d.ramassages.filter((r) => r.bandeId === b.id), d.mortalites.filter((m) => m.bandeId === b.id))) out.push({ categorie: 'poules', texte: `${b.nom} : ${texte}` });
   }
   return out;

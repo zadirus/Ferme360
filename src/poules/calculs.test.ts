@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { alertes, effectifActuel, indicateurs, stockOeufs, tauxPonteJour } from './calculs';
+import { alerteEau, alertes, bilanBande, effectifActuel, indicateurs, prixMoyenOeuf, stockOeufs, tauxPonteJour } from './calculs';
+import { lireCourbe, lireProphylaxie, tauxStandard, vaccinsAFaire } from './programmes';
 import type { Bande, Mortalite, MvtOeufs, Ramassage } from './types';
 
 const bande: Bande = {
@@ -55,5 +56,49 @@ describe('indicateurs et alertes', () => {
   it('alerte de mortalité élevée sur un jour', () => {
     expect(alertes(bande, [], [mort('2026-11-05', 9)])).toHaveLength(1);
     expect(alertes(bande, [], [mort('2026-11-05', 2)])).toHaveLength(0);
+  });
+});
+
+
+describe('programme de vaccination et courbe', () => {
+  const b: Bande = { ...bande, dateArrivee: '2026-11-01', ageArriveeSemaines: 0 };
+  const programme = lireProphylaxie('Marek : 1\nNewcastle : 7\nGumboro : 14\nligne sans nombre');
+  it('lecture des lignes « produit : jour »', () => {
+    expect(programme).toEqual([{ produit: 'Marek', ageJours: 1 }, { produit: 'Newcastle', ageJours: 7 }, { produit: 'Gumboro', ageJours: 14 }]);
+  });
+  it('vaccins à faire : en retard ou dans les 7 jours, hors ceux déjà enregistrés ou faits avant l’arrivée', () => {
+    const sante = (produit: string) => ({ bandeId: 'x', date: '2026-11-08', type: 'vaccin' as const, produit, note: '', rappel: '' });
+    const r = vaccinsAFaire(b, programme, [sante('newcastle')], '2026-11-12');
+    expect(r).toEqual([{ produit: 'Marek', date: '2026-11-02', retard: true }, { produit: 'Gumboro', date: '2026-11-15', retard: false }]);
+    expect(vaccinsAFaire(b, programme, [], '2026-11-20').map((v) => [v.produit, v.retard])).toEqual([['Marek', true], ['Newcastle', true], ['Gumboro', true]]);
+    // poussins de 2 semaines à l'arrivée : Marek et Newcastle ont eu lieu avant, seul le Gumboro (jour 14) reste à faire
+    expect(vaccinsAFaire({ ...b, ageArriveeSemaines: 2 }, programme, [], '2026-11-12').map((v) => v.produit)).toEqual(['Gumboro']);
+  });
+  it('courbe de référence interpolée', () => {
+    const c = lireCourbe('20 : 50\n30 : 90\n40 : 80');
+    expect(tauxStandard(c, 25)).toBe(70);
+    expect(tauxStandard(c, 35)).toBe(85);
+    expect(tauxStandard(c, 10)).toBeNull();
+  });
+});
+
+describe('eau et bilan de bande', () => {
+  const eau = (date: string, litres: number) => ({ bandeId: 'b', date, litres });
+  const bb: Bande = { ...bande, effectifInitial: 400 };
+  it('alerte si l’eau par poule baisse de plus de 20 %', () => {
+    const base = [eau('2026-11-01', 40), eau('2026-11-02', 40), eau('2026-11-03', 40)];
+    expect(alerteEau({ ...bb, id: 'b' } as never, [...base, eau('2026-11-04', 28)], [])).toMatch(/baisse de 30 %/);
+    expect(alerteEau({ ...bb, id: 'b' } as never, [...base, eau('2026-11-04', 36)], [])).toBeNull();
+  });
+  it('bilan : coût du plateau et marge estimée', () => {
+    const ventes = [{ lignes: [{ article: 'oeufs', unite: 'plateau', quantite: 10, prixUnitaire: 2400 }] }];
+    expect(prixMoyenOeuf(ventes)).toBe(80);
+    const r = [{ bandeId: 'b', date: '2026-11-02', bons: 3000, feles: 0, casses: 0 }];
+    const bil = bilanBande({ ...bb, prixAchat: 400000 }, r, [], [], 100000, 80);
+    expect(bil.plateauxBons).toBe(100);
+    expect(bil.coutPlateau).toBe(5000);
+    expect(bil.valeurOeufs).toBe(240000);
+    expect(bil.marge).toBe(-260000);
+    expect(bilanBande(bb, r, [], [], 0, null).marge).toBeNull();
   });
 });

@@ -11,6 +11,11 @@ import { miseBasPrevue } from '../ruminants/calculs';
 import { libelleAnimal, useRuminants } from '../ruminants/donnees';
 import { NOM_SOIN } from '../ruminants/types';
 import { Alertes } from '../ui';
+import { CATEGORIES_ROLE, construireAlertes } from '../alertes';
+import type { Role } from '../droits';
+import { lireProphylaxie } from '../poules/programmes';
+import type { Eau } from '../poules/types';
+import { ID_PROGRAMMES } from '../reglages';
 import { useEffect, useState } from 'preact/hooks';
 import { etatPush } from '../push';
 import { pinDefini } from '../pin';
@@ -80,16 +85,15 @@ export function Accueil() {
     .sort((x, y) => x.date.localeCompare(y.date));
   const rappelsAnimaux = rum.soins.filter((s) => s.rappel && joursEntre(today(), s.rappel) <= 14);
 
-  const toutes = [
-    ...misesBas.filter((m) => m.date < today()).map((m) => `${libelleAnimal(m.a)} : mise bas en retard (prévue le ${fmtDate(m.date)})`),
-    ...bandes.flatMap((b) =>
-      alertes(b, ram.filter((r) => r.bandeId === b.id), morts.filter((m) => m.bandeId === b.id)).map((a) => `${b.nom} : ${a}`)
-    ),
-    ...alertesStock,
-    ...(argent ? cr : [])
-      .filter((c) => c.jours > REGLAGES.joursCreance)
-      .map((c) => `${clients.find((x) => x.id === c.clientId)?.nom ?? 'Client'} doit ${fmtFcfa(c.solde)} depuis ${c.jours} jours`)
-  ];
+  // mêmes alertes que les notifications du matin, limitées à ce que le profil a le droit de voir
+  const toutesBandes = useItems<Bande>('bande');
+  const programmes = useItems<{ prophylaxie?: string }>('reglage').find((x) => x.id === ID_PROGRAMMES);
+  const eaux = useItems<Eau>('eau');
+  const permises = CATEGORIES_ROLE[role as Role] ?? [];
+  const toutes = construireAlertes(
+    { bandes: toutesBandes, ramassages: ram, mortalites: morts, santes, animaux: rum.animaux, mvtsAnimaux: rum.mvts, repro: rum.repro, misesBas: rum.misesBas, soins: rum.soins, articles, stockMvts, ventes, paiements, clients, programme: lireProphylaxie(programmes?.prophylaxie ?? ''), eaux },
+    today()
+  ).filter((a) => permises.includes(a.categorie)).map((a) => a.texte);
 
   const rappels = santes
     .filter((s) => s.rappel && joursEntre(today(), s.rappel) <= 14)

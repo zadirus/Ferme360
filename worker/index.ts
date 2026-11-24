@@ -3,7 +3,8 @@
 import { CATEGORIES_ROLE, construireAlertes, resumeNotification, type CategorieNotif, type DonneesAlertes } from '../src/alertes';
 import { collectionsLisibles, peutEcrire, ROLES_CREABLES, type Role } from '../src/droits';
 import { chiffrerPush, genererCleVapid, jetonVapid } from '../src/push/chiffrement';
-import { appliquerReglages, ID_REGLAGES, REGLAGES } from '../src/reglages';
+import { lireProphylaxie } from '../src/poules/programmes';
+import { appliquerReglages, ID_PROGRAMMES, ID_REGLAGES, REGLAGES } from '../src/reglages';
 
 interface Env {
   DB: D1Database;
@@ -479,8 +480,10 @@ async function envoyerPush(db: D1Database, sub: Abonnement, charge: object): Pro
 async function donneesAlertes(db: D1Database): Promise<DonneesAlertes> {
   const r = await db.prepare(`SELECT id,collection,data,updated_at FROM records WHERE deleted=0`).all<{ id: string; collection: string; data: string; updated_at: number }>();
   const par = new Map<string, unknown[]>();
+  let programme: ReturnType<typeof lireProphylaxie> = [];
   for (const x of r.results) {
     if (x.collection === 'reglage' && x.id === ID_REGLAGES) appliquerReglages(JSON.parse(x.data));
+    if (x.collection === 'reglage' && x.id === ID_PROGRAMMES) programme = lireProphylaxie(String(JSON.parse(x.data).prophylaxie ?? ''));
     const liste = par.get(x.collection) ?? [];
     liste.push({ ...JSON.parse(x.data), id: x.id, updatedAt: x.updated_at });
     par.set(x.collection, liste);
@@ -489,7 +492,7 @@ async function donneesAlertes(db: D1Database): Promise<DonneesAlertes> {
   return {
     bandes: g('bande'), ramassages: g('ramassage'), mortalites: g('mortalite'), santes: g('sante'), animaux: g('animal'), mvtsAnimaux: g('mvt_animal'),
     repro: g('repro'), misesBas: g('misebas'), soins: g('soin'), articles: g('article'), stockMvts: g('stock_mvt'), ventes: g('vente'),
-    paiements: g('paiement'), clients: g('client')
+    paiements: g('paiement'), clients: g('client'), programme, eaux: g('eau')
   };
 }
 

@@ -67,3 +67,10 @@ Avant de livrer : `npm run build` doit passer.
 - La reprise ne crée JAMAIS de mouvement d'argent : prix d'achat gardé pour mémoire, solde client = `vente` avec `reprise: true` (comptée en créance, exclue des ventes et des résultats), stock de départ = entrée sans achat.
 - Aide : `src/pages/Aide.tsx` ; liste « Premiers pas » sur l'accueil (propriétaire et gérant) ; indicateurs mémorisés en localStorage (`ferme360.equipe`, `ferme360.sauvegarde`, `ferme360.premiers`).
 - Tests : `src/import/*.test.ts` (jsdom pour DOMParser ; fixture Excel réelle `src/import/fixtures/exemple.xlsx`), `e2e/import.cjs` (3 000 animaux : import 3 s, affichage < 1 s sur ordinateur).
+
+## Poules : compléments (étape 7, lot 3)
+- Programme de vaccination et courbe de ponte de référence : deux textes dans `reglage` id `programmes-ferme` (`src/poules/programmes.ts`) ; `vaccinsAFaire` calcule, pour chaque bande, les vaccins en retard ou à faire sous 7 jours (rappel automatique, disparaît quand le vaccin est enregistré dans la santé de la bande). Les exemples fournis sont indicatifs, à valider avec un vétérinaire.
+- Eau (`eau`) : alerte si l'eau par poule baisse de plus de `eauBaissePct` % par rapport aux 3 jours précédents. Fientes (`fientes`) : stock = sacs sortis − ventes de fumier en sacs de l'activité poules.
+- Courbe de ponte (`src/courbe.tsx`, SVG) : taux de la bande selon l'âge en semaines, comparé à la courbe de référence. Bilan de bande : coût du plateau = (prix d'achat + aliment) ÷ plateaux de bons œufs ; marge estimée avec le prix moyen de vente de l'œuf.
+- L'accueil utilise `construireAlertes` (src/alertes.ts) : mêmes alertes à l'écran et dans les notifications.
+- Test : `e2e/poules2.cjs`.

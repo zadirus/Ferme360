@@ -5,11 +5,17 @@ import { fmtDate, fmtDec, fmtFcfa, fmtInt, fmtPct, joursEntre, OEUFS_PAR_PLATEAU
 import { alertes, effectifActuel, indicateurs } from '../poules/calculs';
 import { coutDistribution, coutMoyen } from '../gestion/calculs';
 import type { Achat, Article, StockMvt } from '../gestion/types';
-import type { Aliment, Bande, Mortalite, Ramassage, Sante } from '../poules/types';
+import { alerteEau, eauParPoule } from '../poules/calculs';
+import { prixMoyenOeuf } from '../poules/calculs';
+import type { Aliment, Bande, Eau, Fientes, Mortalite, Ramassage, Sante } from '../poules/types';
+import { ID_PROGRAMMES } from '../reglages';
+import { lireProphylaxie } from '../poules/programmes';
+import type { Vente } from '../gestion/types';
+import { BilanBande, CourbePonte, EauForm, FientesForm, VaccinsAFaire } from './BandeExtras';
 import { newId, saveRecord } from '../sync';
 import { Alertes, Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
 
-type Action = 'ramassage' | 'mortalite' | 'aliment' | 'sante';
+type Action = 'ramassage' | 'mortalite' | 'aliment' | 'sante' | 'eau' | 'fientes';
 
 interface Evenement {
   id: string;
@@ -28,6 +34,10 @@ export function BandeDetail({ id }: { id: string }) {
   const morts = useItems<Mortalite>('mortalite').filter((x) => x.bandeId === id);
   const aliments = useItems<Aliment>('aliment').filter((x) => x.bandeId === id);
   const santes = useItems<Sante>('sante').filter((x) => x.bandeId === id);
+  const eaux = useItems<Eau>('eau').filter((x) => x.bandeId === id);
+  const fientes = useItems<Fientes>('fientes').filter((x) => x.bandeId === id);
+  const ventesTous = useItems<Vente>('vente');
+  const programmes = useItems<{ prophylaxie?: string; courbe?: string }>('reglage').find((x) => x.id === ID_PROGRAMMES);
   const stockMvts = useItems<StockMvt>('stock_mvt');
   const articlesTous = useItems<Article>('article');
   const achatsTous = useItems<Achat>('achat');
@@ -90,7 +100,9 @@ export function BandeDetail({ id }: { id: string }) {
       id: s.id, collection: 'sante', date: s.date, updatedAt: s.updatedAt,
       texte: `${s.type === 'vaccin' ? 'Vaccin' : s.type === 'traitement' ? 'Traitement' : 'Santé'} : ${s.produit}${s.rappel ? ` · rappel le ${fmtDate(s.rappel)}` : ''}`,
       supprimer: suppr('sante', s)
-    }))
+    })),
+    ...eaux.map((e) => ({ id: e.id, collection: 'eau', date: e.date, updatedAt: e.updatedAt, texte: `Eau : ${fmtDec(e.litres, 0)} litres`, supprimer: suppr('eau', e) })),
+    ...fientes.map((f) => ({ id: f.id, collection: 'fientes', date: f.date, updatedAt: f.updatedAt, texte: `Fientes : ${fmtDec(f.sacs, 0)} sac(s)`, supprimer: suppr('fientes', f) }))
   ]
     .sort((x, y) => y.date.localeCompare(x.date) || y.updatedAt - x.updatedAt)
     .slice(0, 40);
@@ -110,7 +122,8 @@ export function BandeDetail({ id }: { id: string }) {
         {[b.batiment, b.souche, `arrivée le ${fmtDate(b.dateArrivee)}`, `${ageSemaines} semaines`].filter(Boolean).join(' · ')}
         {b.cloturee && ` · clôturée le ${fmtDate(b.dateCloture ?? '')}`}
       </p>
-      <Alertes liste={al} />
+      <Alertes liste={[...al, ...(() => { const e = alerteEau({ ...b, id }, eaux, morts); return e ? [e] : []; })()]} />
+      <VaccinsAFaire bande={{ ...b, id }} programme={lireProphylaxie(programmes?.prophylaxie ?? '')} santes={santes} peutEnregistrer={ecrit('sante')} />
 
       <div class="stats">
         <Stat valeur={fmtInt(i.effectif)} label="Poules présentes" />
@@ -118,6 +131,7 @@ export function BandeDetail({ id }: { id: string }) {
         <Stat valeur={fmtPct(i.mortalitePct)} label="Mortalité" />
         <Stat valeur={fmtDec(i.oeufsParPoule, 1)} label="Œufs par poule départ" />
         <Stat valeur={`${fmtDec(i.alimentKg, 0)} kg`} label="Aliment distribué" />
+        {eaux.length > 0 && (() => { const d = [...eaux].sort((a, c) => c.date.localeCompare(a.date))[0].date; const m = eauParPoule({ ...b }, eaux, morts, d); return m !== null ? <Stat valeur={`${fmtDec(m, 0)} ml`} label={`Eau par poule le ${fmtDate(d)}`} /> : null; })()}
         <Stat valeur={i.indiceConso !== null ? fmtDec(i.indiceConso, 2) : '—'} label="Indice de consommation" />
         {argent && coutAliment > 0 && <Stat valeur={fmtFcfa(coutAliment)} label="Coût de l'aliment" />}
         {argent && coutAliment > 0 && i.oeufsCumules > 0 && <Stat valeur={fmtFcfa(coutAliment / (i.oeufsCumules / OEUFS_PAR_PLATEAU))} label="Aliment par plateau" />}
@@ -131,6 +145,8 @@ export function BandeDetail({ id }: { id: string }) {
           {ecrit('mortalite') && <button class="principal" type="button" onClick={() => setAction('mortalite')}><span class="e">💀</span>Mortalité / réforme</button>}
           {ecrit('aliment') && <button class="principal" type="button" onClick={() => setAction('aliment')}><span class="e">🌽</span>Aliment</button>}
           {ecrit('sante') && <button class="principal" type="button" onClick={() => setAction('sante')}><span class="e">💉</span>Santé</button>}
+          {ecrit('eau') && <button class="principal" type="button" onClick={() => setAction('eau')}><span class="e">💧</span>Eau</button>}
+          {ecrit('fientes') && <button class="principal" type="button" onClick={() => setAction('fientes')}><span class="e">🧺</span>Fientes</button>}
         </div>
       )}
 
@@ -138,6 +154,8 @@ export function BandeDetail({ id }: { id: string }) {
       {action === 'mortalite' && <MortaliteForm bandeId={id} effectif={effectifActuel(b, morts)} onFini={fini} />}
       {action === 'aliment' && <AlimentForm bandeId={id} onFini={fini} />}
       {action === 'sante' && <SanteForm bandeId={id} onFini={fini} />}
+      {action === 'eau' && <EauForm bandeId={id} onFini={fini} />}
+      {action === 'fientes' && <FientesForm bandeId={id} onFini={fini} />}
 
       {rappels.length > 0 && (
         <>
@@ -152,6 +170,9 @@ export function BandeDetail({ id }: { id: string }) {
           </ul>
         </>
       )}
+
+      <CourbePonte bande={{ ...b, id }} ram={ram} morts={morts} courbeTexte={programmes?.courbe ?? ''} />
+      {argent && <BilanBande bande={{ ...b, id }} ram={ram} morts={morts} aliments={aliments} coutAliment={coutAliment} prixOeuf={prixMoyenOeuf(ventesTous)} />}
 
       <h3>Historique</h3>
       <ul>

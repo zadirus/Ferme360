@@ -45,6 +45,18 @@ export interface Sante {
   rappel: string; // date du prochain rappel, vide si aucun
 }
 
+export interface Eau {
+  bandeId: string;
+  date: string;
+  litres: number;
+}
+
+export interface Fientes {
+  bandeId: string;
+  date: string;
+  sacs: number;
+}
+
 // Mouvement d'œufs hors ramassage : on ajoute, on ne modifie pas.
 export interface MvtOeufs {
   date: string;

@@ -9,6 +9,7 @@ export interface Reglages {
   poidsOeufG: number; // pour l'indice de consommation
   gestationOvin: number;
   gestationBovin: number;
+  eauBaissePct: number; // alerte si l'eau bue par poule baisse de ce pourcentage
   heureNotif: number; // heure locale d'envoi des notifications du matin
   decalageUtc: number; // décalage horaire de la ferme par rapport à l'heure UTC (0 en Côte d'Ivoire et au Sénégal, +1 au Bénin et au Cameroun)
 }
@@ -23,12 +24,14 @@ export const DEFAUTS: Reglages = {
   poidsOeufG: 60,
   gestationOvin: 150,
   gestationBovin: 283,
+  eauBaissePct: 20,
   heureNotif: 6,
   decalageUtc: 0
 };
 
 export const REGLAGES: Reglages = { ...DEFAUTS };
 export const ID_REGLAGES = 'reglages-ferme';
+export const ID_PROGRAMMES = 'programmes-ferme'; // vaccins par âge et courbe de ponte de référence (textes modifiables)
 
 export function appliquerReglages(r: Partial<Reglages>) {
   Object.assign(REGLAGES, DEFAUTS);

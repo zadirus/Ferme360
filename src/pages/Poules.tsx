@@ -3,7 +3,8 @@ import { useItems, useRole } from '../hooks';
 import { peutEcrire } from '../droits';
 import { fmtDate, fmtInt, fmtPct, today } from '../format';
 import { alertes, indicateurs } from '../poules/calculs';
-import type { Aliment, Bande, Mortalite, Ramassage } from '../poules/types';
+import type { Aliment, Bande, Fientes, Mortalite, Ramassage } from '../poules/types';
+import type { Vente } from '../gestion/types';
 import { newId, saveRecord } from '../sync';
 import { Alertes, Boutons, Champ, nombre, Retour } from '../ui';
 
@@ -12,6 +13,9 @@ export function Poules() {
   const ram = useItems<Ramassage>('ramassage');
   const morts = useItems<Mortalite>('mortalite');
   const aliments = useItems<Aliment>('aliment');
+  const fientes = useItems<Fientes>('fientes');
+  const ventes = useItems<Vente>('vente');
+  const sacsEnStock = fientes.reduce((s, f) => s + f.sacs, 0) - ventes.filter((v) => v.activite === 'poules').flatMap((v) => v.lignes).filter((l) => l.article === 'fumier' && l.unite === 'sac').reduce((s, l) => s + l.quantite, 0);
   const [creation, setCreation] = useState(false);
   const role = useRole();
 
@@ -45,6 +49,7 @@ export function Poules() {
     <section>
       <Retour vers="/elevage" texte="Élevage" />
       <h2>Poules pondeuses</h2>
+      {fientes.length > 0 && <p class="intro">Fientes en stock : <strong>{fmtInt(Math.max(0, sacsEnStock))} sac(s)</strong> (sorties du poulailler moins ventes)</p>}
       {!creation && peutEcrire(role, 'bande') && (
         <button class="principal" type="button" onClick={() => setCreation(true)}>
           + Nouvelle bande
