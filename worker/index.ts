@@ -234,7 +234,8 @@ async function setup(req: Request, env: Env): Promise<Response> {
 
 async function login(req: Request, env: Env): Promise<Response> {
   const b = await readBody(req);
-  const name = String(b?.name ?? '').trim();
+  // espaces multiples ignorés, majuscules/minuscules indifférentes (le clavier du téléphone met souvent une majuscule)
+  const name = String(b?.name ?? '').trim().replace(/\s+/g, ' ');
   const password = String(b?.password ?? '');
   if (!name || !password) return fail(400, 'Nom et mot de passe requis.');
   const now = Date.now();
@@ -242,7 +243,7 @@ async function login(req: Request, env: Env): Promise<Response> {
     .bind(name)
     .first<{ fails: number; locked_until: number }>();
   if (att && att.locked_until > now) return fail(429, 'Trop d’essais. Réessayez dans quelques minutes.');
-  const u = await env.DB.prepare(`SELECT id,name,role,salt,hash,active FROM users WHERE name=?`)
+  const u = await env.DB.prepare(`SELECT id,name,role,salt,hash,active FROM users WHERE name=? COLLATE NOCASE`)
     .bind(name)
     .first<{ id: string; name: string; role: string; salt: string; hash: string; active: number }>();
   const hash = await hashPassword(password, u?.salt ?? '00'.repeat(16));
@@ -379,7 +380,7 @@ async function listeComptes(env: Env): Promise<Response> {
 
 async function creerCompte(req: Request, env: Env): Promise<Response> {
   const b = await readBody(req);
-  const name = String(b?.name ?? '').trim();
+  const name = String(b?.name ?? '').trim().replace(/\s+/g, ' ');
   const password = String(b?.password ?? '');
   const role = String(b?.role ?? '');
   if (name.length < 2 || name.length > 60) return fail(400, 'Le nom doit avoir entre 2 et 60 caractères.');
