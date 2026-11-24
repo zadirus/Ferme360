@@ -58,7 +58,7 @@ export function Auth({ onDone, reconnect }: Props) {
         {!configured && (
           <label>
             Code d'installation
-            <input value={code} onInput={(e) => setCode(e.currentTarget.value)} autocomplete="off" required />
+            <input value={code} onInput={(e) => setCode(e.currentTarget.value)} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck={false} required />
           </label>
         )}
         <label>

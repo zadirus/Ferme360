@@ -173,8 +173,8 @@ async function setup(req: Request, env: Env): Promise<Response> {
   const b = await readBody(req);
   const name = String(b?.name ?? '').trim();
   const password = String(b?.password ?? '');
-  const code = String(b?.code ?? '');
-  if (!env.SETUP_CODE || !safeEqual(code, env.SETUP_CODE)) return fail(403, "Code d'installation incorrect.");
+  const code = String(b?.code ?? '').trim();
+  if (!env.SETUP_CODE || !safeEqual(code, env.SETUP_CODE.trim())) return fail(403, "Code d'installation incorrect.");
   if (name.length < 2 || name.length > 60) return fail(400, 'Le nom doit avoir entre 2 et 60 caractères.');
   if (password.length < 8) return fail(400, 'Le mot de passe doit avoir au moins 8 caractères.');
   if ((await userCount(env.DB)) > 0) return fail(409, 'La ferme est déjà installée.');
