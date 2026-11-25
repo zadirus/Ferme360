@@ -271,3 +271,12 @@ button.gros, button.principal.gros { min-height: 62px; font-size: 1.15rem; borde
 .liste-animaux button { display: grid; text-align: left; width: 100%; min-height: 60px; padding: 10px 14px; border-radius: 16px; border: 2px solid var(--trait); background: var(--carte); font-size: 1.05rem; gap: 2px; }
 .liste-animaux button span { color: var(--gris); font-size: .86rem; }
 .animal-choisi { font-size: 1.3rem; margin: 6px 0; }
+.champ-date { display: grid; gap: 6px; margin: 12px 0; }
+.champ-date .libelle { font-weight: 700; color: var(--vert-fonce); }
+.champ-date input { min-height: 56px; font-size: 1.15rem; }
+.champ-date .retro { color: var(--terre); font-weight: 700; }
+.gros-bouton.soin { background: #ece6f6; border-color: #cfc3e6; }
+.lien-liste { display: inline-block; margin: 6px 0 16px; font-weight: 700; }
+.saisies-jour li > div { display: grid; gap: 2px; }
+.saisies-jour small { color: var(--gris); }
+.filtre-types { margin: 6px 0 4px; }

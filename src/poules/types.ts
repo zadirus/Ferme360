@@ -32,6 +32,7 @@ export interface Aliment {
   bandeId: string;
   date: string;
   kg: number;
+  sacs?: number; // quantité saisie en sacs (kg = sacs × poids du sac)
   type: 'demarrage' | 'croissance' | 'ponte';
   articleId?: string; // article du stock d'aliment utilisé
   cout?: number; // coût en FCFA au moment de la distribution

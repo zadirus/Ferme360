@@ -21,7 +21,8 @@ const ECRITURE: Record<Role, string[] | '*'> = {
   gerant: '*',
   ouvrier: [
     'ramassage', 'mortalite', 'aliment', 'oeufs_mvt', 'stock_mvt', 'carnet', 'eau', 'fientes',
-    'animal', 'mvt_animal', 'pesee', 'repro', 'misebas', 'ration', 'photo', 'pature', 'traite', 'travail'
+    'animal', 'mvt_animal', 'pesee', 'repro', 'misebas', 'ration', 'photo', 'pature', 'traite', 'travail',
+    'soin', 'sante'
   ],
   veterinaire: ['soin', 'sante', 'pesee', 'repro', 'carnet', 'photo', 'stock_mvt']
 };

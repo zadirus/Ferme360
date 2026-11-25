@@ -7,7 +7,7 @@ import { peut, peutToutSupprimer } from './droits';
 import { appliquerReglages, ID_REGLAGES, type Reglages as TypeReglages } from './reglages';
 import { Equipe, Journal, MotDePasse, Plus } from './pages/Admin';
 import { Corbeille } from './pages/Corbeille';
-import { AccueilAgent, SaisieAliment, SaisieDeces, SaisieOeufs, SaisiePesee } from './pages/Agent';
+import { AccueilAgent, SaisieAliment, SaisieDeces, SaisieHistorique, SaisieOeufs, SaisiePesee, SaisieSoin } from './pages/Agent';
 import { Rapports } from './pages/Rapports';
 import { Notifications } from './pages/Notifications';
 import { Aide } from './pages/Aide';
@@ -164,6 +164,8 @@ export function App() {
   else if (route === '/saisie/deces') page = <SaisieDeces />;
   else if (route === '/saisie/aliment') page = <SaisieAliment />;
   else if (route === '/saisie/pesee') page = <SaisiePesee />;
+  else if (route === '/saisie/soin') page = <SaisieSoin />;
+  else if (route === '/saisie/historique') page = <SaisieHistorique />;
   else page = role === 'ouvrier' ? <AccueilAgent /> : <Accueil />;
 
   const actif = (p: string) => (p === '/' ? route === '/' : (FAMILLES[p] ?? [p]).some((x) => route.startsWith(x)));
