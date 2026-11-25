@@ -1,4 +1,5 @@
 // Interface simplifiée de l'agent d'élevage : gros boutons, une saisie = un écran, aucun menu à chercher.
+import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import { peutSupprimerSaisie } from '../droits';
 import { dataOf, go, useItems, useRole, type Item } from '../hooks';
@@ -64,13 +65,13 @@ function ChampDate({ valeur, onChange }: { valeur: string; onChange: (d: string)
   );
 }
 
-function Fait({ titre, detail, encore }: { titre: string; detail: string; encore: string }) {
+function Fait({ titre, detail, onEncore }: { titre: string; detail: string; onEncore: () => void }) {
   return (
     <section class="fait">
       <div class="coche" aria-hidden="true">✓</div>
       <h2>{titre}</h2>
       <p class="intro">{detail}</p>
-      <button class="principal gros" type="button" onClick={() => go(encore)}>Faire une autre saisie</button>
+      <button class="principal gros" type="button" onClick={onEncore}>Faire une autre saisie</button>
       <button class="secondaire gros" type="button" onClick={() => go('/saisie/historique')}>Voir mes saisies</button>
       <button class="secondaire gros" type="button" onClick={() => go('/')}>Retour à l’accueil</button>
     </section>
@@ -233,9 +234,15 @@ export function AccueilAgent() {
   );
 }
 
+// « Faire une autre saisie » repart d'un écran vide (même adresse, donc on recrée l'écran)
+const avecRelance = (Ecran: (p: { relancer: () => void }) => JSX.Element) => () => {
+  const [n, setN] = useState(0);
+  return <Ecran key={n} relancer={() => setN(n + 1)} />;
+};
+
 // ---------- saisies ----------
 
-export function SaisieOeufs() {
+function SaisieOeufsEcran({ relancer }: { relancer: () => void }) {
   const { bandes, bande, selecteur } = useBande();
   const ram = useItems<Ramassage>('ramassage');
   const [date, setDate] = useState(today());
@@ -243,7 +250,7 @@ export function SaisieOeufs() {
   const [feles, setFeles] = useState(0);
   const [casses, setCasses] = useState(0);
   const [fait, setFait] = useState('');
-  if (fait) return <Fait titre="Ramassage enregistré" detail={fait} encore="/saisie/oeufs" />;
+  if (fait) return <Fait titre="Ramassage enregistré" detail={fait} onEncore={relancer} />;
   const total = bons + feles + casses;
   async function envoyer(e: Event) {
     e.preventDefault();
@@ -274,7 +281,7 @@ export function SaisieOeufs() {
 const CAUSES_DE_BASE = ['Maladie', 'Chaleur', 'Accident ou prédateur', 'Je ne sais pas'];
 const AUTRE = '__autre';
 
-export function SaisieDeces() {
+function SaisieDecesEcran({ relancer }: { relancer: () => void }) {
   const { bandes, bande, selecteur, effectif } = useBande();
   const morts = useItems<Mortalite>('mortalite');
   const [date, setDate] = useState(today());
@@ -283,7 +290,7 @@ export function SaisieDeces() {
   const [autre, setAutre] = useState('');
   const [fait, setFait] = useState('');
   const [erreur, setErreur] = useState('');
-  if (fait) return <Fait titre="Décès enregistré" detail={fait} encore="/saisie/deces" />;
+  if (fait) return <Fait titre="Décès enregistré" detail={fait} onEncore={relancer} />;
   // les causes déjà saisies par l'équipe s'ajoutent aux choix proposés
   const apprises = [...new Map(morts.map((m) => m.cause.trim()).filter(Boolean).filter((c) => !CAUSES_DE_BASE.some((b) => b.toLowerCase() === c.toLowerCase())).map((c) => [c.toLowerCase(), c])).values()].sort((a, b) => a.localeCompare(b, 'fr'));
   const options: Array<[string, string]> = [...CAUSES_DE_BASE, ...apprises].map((c) => [c, c]);
@@ -322,7 +329,7 @@ export function SaisieDeces() {
   );
 }
 
-export function SaisieAliment() {
+function SaisieAlimentEcran({ relancer }: { relancer: () => void }) {
   const { bandes, bande, selecteur } = useBande();
   const articles = useItems<Article>('article').filter((a) => a.categorie === 'aliment');
   const achats = useItems<Achat>('achat');
@@ -333,7 +340,7 @@ export function SaisieAliment() {
   const [typeAliment, setTypeAliment] = useState<Aliment['type']>('ponte');
   const [articleId, setArticleId] = useState('');
   const [fait, setFait] = useState('');
-  if (fait) return <Fait titre="Aliment enregistré" detail={fait} encore="/saisie/aliment" />;
+  if (fait) return <Fait titre="Aliment enregistré" detail={fait} onEncore={relancer} />;
   const choisi = articleId || (articles.length === 1 ? articles[0].id : '');
   const article = articles.find((a) => a.id === choisi);
   const kgSac = article && article.kgParUnite > 1 ? article.kgParUnite : 50;
@@ -375,14 +382,14 @@ export function SaisieAliment() {
   );
 }
 
-export function SaisiePesee() {
+function SaisiePeseeEcran({ relancer }: { relancer: () => void }) {
   const r = useRuminants();
   const [recherche, setRecherche] = useState('');
   const [animalId, setAnimalId] = useState('');
   const [date, setDate] = useState(today());
   const [poids, setPoids] = useState(0);
   const [fait, setFait] = useState('');
-  if (fait) return <Fait titre="Pesée enregistrée" detail={fait} encore="/saisie/pesee" />;
+  if (fait) return <Fait titre="Pesée enregistrée" detail={fait} onEncore={relancer} />;
   const presents = r.animaux.filter((a) => r.statut(a.id) === 'present').sort((a, b) => a.boucle.localeCompare(b.boucle, 'fr', { numeric: true }));
   const q = recherche.trim().toLowerCase();
   const liste = presents.filter((a) => !q || `${a.boucle} ${a.nom}`.toLowerCase().includes(q)).slice(0, 12);
@@ -419,7 +426,7 @@ export function SaisiePesee() {
 }
 
 // Soigner : vaccin ou médicament donné aux poules, à un animal ou à un lot ; le produit est retiré du stock
-export function SaisieSoin() {
+function SaisieSoinEcran({ relancer }: { relancer: () => void }) {
   const role = useRole();
   const bandes = useItems<Bande>('bande').filter((b) => !b.cloturee);
   const r = useRuminants();
@@ -440,7 +447,7 @@ export function SaisieSoin() {
   const [note, setNote] = useState('');
   const [fait, setFait] = useState('');
   const [erreur, setErreur] = useState('');
-  if (fait) return <Fait titre="Soin enregistré" detail={fait} encore="/saisie/soin" />;
+  if (fait) return <Fait titre="Soin enregistré" detail={fait} onEncore={relancer} />;
 
   const bande = bandes.length === 1 ? bandes[0] : bandes.find((b) => b.id === bandeId);
   const presents = r.animaux.filter((a) => r.statut(a.id) === 'present').sort((a, b) => a.boucle.localeCompare(b.boucle, 'fr', { numeric: true }));
@@ -504,6 +511,12 @@ export function SaisieSoin() {
     </section>
   );
 }
+
+export const SaisieOeufs = avecRelance(SaisieOeufsEcran);
+export const SaisieDeces = avecRelance(SaisieDecesEcran);
+export const SaisieAliment = avecRelance(SaisieAlimentEcran);
+export const SaisiePesee = avecRelance(SaisiePeseeEcran);
+export const SaisieSoin = avecRelance(SaisieSoinEcran);
 
 // ---------- accueil du vétérinaire ----------
 
