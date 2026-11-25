@@ -1,10 +1,11 @@
+import { getUser } from '../session';
 import { useState } from 'preact/hooks';
 import { dataOf, useItems, useRole } from '../hooks';
 import { EtiquettesFiche } from '../etiquettes';
 import { ActionsFiche } from '../ActionsFiche';
 import { nomDejaPris } from '../integrite';
 import { TYPES_LOT } from './Ruminants';
-import { peut, peutEcrire } from '../droits';
+import { peut, peutEcrire, peutSupprimerSaisie } from '../droits';
 import { fmtDate, fmtDec, fmtFcfa, fmtInt, joursEntre, today } from '../format';
 import { coutDistribution, coutMoyen } from '../gestion/calculs';
 import type { Achat, Article, StockMvt, Vente } from '../gestion/types';
@@ -118,10 +119,10 @@ export function LotDetail({ id }: { id: string }) {
 
       {(r.rations.some((x) => x.lotId === id) || r.soins.some((s) => s.lotId === id)) && <h3>Rations et soins du lot</h3>}
       <ul>
-        {[...r.rations.filter((x) => x.lotId === id).map((x) => ({ cle: 'r' + x.id, date: x.date, texte: `Ration : ${fmtDec(x.kg, 0)} kg${argent && coutDistribution(x, articlesTous, r.achats) ? ` · ${fmtFcfa(coutDistribution(x, articlesTous, r.achats))}` : ''}`, col: 'ration', sup: () => supprRation(x) })),
-          ...r.soins.filter((s) => s.lotId === id).map((s) => ({ cle: 's' + s.id, date: s.date, texte: `${NOM_SOIN[s.type]} : ${s.produit}${s.delaiAttente ? ` · délai ${s.delaiAttente} j` : ''}`, col: 'soin', sup: () => supprSoin(s) }))]
+        {[...r.rations.filter((x) => x.lotId === id).map((x) => ({ cle: 'r' + x.id, maj: x.updatedAt, aut: x.author, date: x.date, texte: `Ration : ${fmtDec(x.kg, 0)} kg${argent && coutDistribution(x, articlesTous, r.achats) ? ` · ${fmtFcfa(coutDistribution(x, articlesTous, r.achats))}` : ''}`, col: 'ration', sup: () => supprRation(x) })),
+          ...r.soins.filter((s) => s.lotId === id).map((s) => ({ cle: 's' + s.id, maj: s.updatedAt, aut: s.author, date: s.date, texte: `${NOM_SOIN[s.type]} : ${s.produit}${s.delaiAttente ? ` · délai ${s.delaiAttente} j` : ''}`, col: 'soin', sup: () => supprSoin(s) }))]
           .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30).map((e) => (
-            <li key={e.cle}><div class="ligne"><span>{e.texte}</span><small>{fmtDate(e.date)}</small></div>{ecrit(e.col) && <button type="button" class="lien" onClick={() => void e.sup()}>Supprimer</button>}</li>
+            <li key={e.cle}><div class="ligne"><span>{e.texte}</span><small>{fmtDate(e.date)}</small></div>{ecrit(e.col) && peutSupprimerSaisie(role, e.maj, e.aut, getUser()?.name) && <button type="button" class="lien" onClick={() => void e.sup()}>Supprimer</button>}</li>
           ))}
       </ul>
     </section>

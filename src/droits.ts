@@ -34,6 +34,15 @@ const LECTURE_EN_PLUS: Record<Role, string[]> = {
   veterinaire: ['bande', 'mortalite', 'animal', 'mvt_animal', 'lot', 'misebas', 'reglage', 'article']
 };
 
+// Suppression : seuls le propriétaire et le gérant peuvent supprimer une saisie validée.
+// Les autres profils peuvent annuler LEUR propre saisie pendant 2 heures, tant qu'elle n'a pas été modifiée
+// (correction d'une erreur de frappe). Le serveur applique la règle ; l'application masque le bouton.
+export const FENETRE_CORRECTION_MS = 2 * 60 * 60 * 1000;
+export const peutToutSupprimer = (role: string) => role === 'owner' || role === 'gerant';
+// `auteur` et `moi` : si l'auteur de la saisie est connu et que ce n'est pas la personne connectée, le bouton est masqué.
+export const peutSupprimerSaisie = (role: string, modifieLe: number, auteur?: string, moi?: string, maintenant = Date.now()) =>
+  peutToutSupprimer(role) || (maintenant - modifieLe <= FENETRE_CORRECTION_MS && (auteur === undefined || moi === undefined || auteur === moi));
+
 const connu = (role: string): role is Role => role in ECRITURE;
 
 export function peutEcrire(role: string, collection: string): boolean {

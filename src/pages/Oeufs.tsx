@@ -1,6 +1,7 @@
+import { getUser } from '../session';
 import { useState } from 'preact/hooks';
 import { dataOf, useItems, useRole } from '../hooks';
-import { peut } from '../droits';
+import { peut, peutSupprimerSaisie } from '../droits';
 import { COMPTES, type Achat, type Compte, type Fournisseur, type Vente } from '../gestion/types';
 import { fmtFcfa } from '../format';
 import { prixMoyenOeuf } from '../poules/calculs';
@@ -77,7 +78,7 @@ export function Oeufs() {
               {fmtInt(m.quantite)} œufs{m.note ? ` (${m.note})` : ''}
             </span>
             <small>{fmtDate(m.date)}</small>
-            {!m.venteId && (!m.achatId || argent) && <button
+            {!m.venteId && (!m.achatId || argent) && peutSupprimerSaisie(role, m.updatedAt, m.author, getUser()?.name) && <button
               type="button"
               class="lien"
               onClick={async () => {

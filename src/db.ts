@@ -99,3 +99,9 @@ export async function purgerSauf(garder: (r: Rec) => boolean): Promise<void> {
 export async function exporterTout(): Promise<Rec[]> {
   return listAll();
 }
+
+// Ce qui a été supprimé (la corbeille)
+export async function listDeleted(): Promise<Rec[]> {
+  const all = await wrap<Rec[]>((await store('records', 'readonly')).getAll());
+  return all.filter((r) => r.deleted);
+}

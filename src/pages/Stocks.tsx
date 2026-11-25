@@ -1,6 +1,7 @@
+import { getUser } from '../session';
 import { useState } from 'preact/hooks';
 import { dataOf, go, useItems, useRole, type Item } from '../hooks';
-import { peut, peutEcrire } from '../droits';
+import { peut, peutEcrire, peutSupprimerSaisie } from '../droits';
 import { fmtDate, fmtFcfa, fmtQte, today } from '../format';
 import { gestionStock } from '../gestion/calculs';
 import { alertesArticle, coutMoyen, lotsRestants, stockArticle } from '../gestion/calculs';
@@ -228,6 +229,7 @@ export function AchatForm({ onFini }: { onFini: (m: string) => void }) {
 }
 
 export function ArticleDetail({ id }: { id: string }) {
+  const role = useRole();
   const articles = useItems<Article>('article');
   const tous = useItems<StockMvt>('stock_mvt');
   const [mode, setMode] = useState<'sortie' | 'inventaire' | null>(null);
@@ -289,7 +291,7 @@ export function ArticleDetail({ id }: { id: string }) {
         {liste.map((m) => (
           <li key={m.id}>
             <div class="ligne"><span>{libelle(m)} : {m.type === 'ajustement' && m.quantite > 0 ? '+' : ''}{fmtQte(m.quantite)} {a.unite}{m.note ? ` (${m.note})` : ''}</span><small>{fmtDate(m.date)}</small></div>
-            {!m.achatId && !m.alimentId && (
+            {!m.achatId && !m.alimentId && peutSupprimerSaisie(role, m.updatedAt, m.author, getUser()?.name) && (
               <button type="button" class="lien" onClick={async () => { if (window.confirm('Supprimer ce mouvement ?')) await saveRecord('stock_mvt', m.id, dataOf(m), true); }}>Supprimer</button>
             )}
           </li>

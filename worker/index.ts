@@ -1,7 +1,7 @@
 // API Ferme360 : connexion et synchronisation hors-ligne (Cloudflare Workers + D1)
 
 import { CATEGORIES_ROLE, construireAlertes, resumeNotification, type CategorieNotif, type DonneesAlertes } from '../src/alertes';
-import { collectionsLisibles, peutEcrire, ROLES_CREABLES, type Role } from '../src/droits';
+import { collectionsLisibles, FENETRE_CORRECTION_MS, peutEcrire, peutToutSupprimer, ROLES_CREABLES, type Role } from '../src/droits';
 import { chiffrerPush, genererCleVapid, jetonVapid } from '../src/push/chiffrement';
 import { lireProphylaxie } from '../src/poules/programmes';
 import { appliquerReglages, ID_PROGRAMMES, ID_REGLAGES, REGLAGES } from '../src/reglages';
@@ -293,7 +293,7 @@ async function sync(req: Request, env: Env, session: Session): Promise<Response>
   const changes = Array.isArray(b.changes) ? b.changes : [];
   if (changes.length > MAX_CHANGES) return fail(413, 'Trop de modifications à la fois.');
 
-  const valides: SyncRecord[] = [];
+  let valides: SyncRecord[] = [];
   const rejected: string[] = [];
   for (const c of changes) {
     if (!validRecord(c)) return fail(400, 'Enregistrement invalide.');
@@ -304,15 +304,34 @@ async function sync(req: Request, env: Env, session: Session): Promise<Response>
 
   if (valides.length) {
     // valeurs actuelles, pour le journal des modifications (100 paramètres maximum par requête D1)
-    const avant = new Map<string, { data: string; updated_at: number; deleted: number }>();
+    const avant = new Map<string, { data: string; updated_at: number; deleted: number; author: string }>();
     const lots: SyncRecord[][] = [];
     for (let i = 0; i < valides.length; i += 90) lots.push(valides.slice(i, i + 90));
     const lus = await env.DB.batch(
       lots.map((l) =>
-        env.DB.prepare(`SELECT id,data,updated_at,deleted FROM records WHERE id IN (${l.map(() => '?').join(',')})`).bind(...l.map((x) => x.id))
+        env.DB.prepare(`SELECT id,data,updated_at,deleted,author FROM records WHERE id IN (${l.map(() => '?').join(',')})`).bind(...l.map((x) => x.id))
       )
     );
-    for (const r of lus) for (const x of r.results as Array<{ id: string; data: string; updated_at: number; deleted: number }>) avant.set(x.id, x);
+    for (const r of lus) for (const x of r.results as Array<{ id: string; data: string; updated_at: number; deleted: number; author: string }>) avant.set(x.id, x);
+
+    // suppression : réservée au propriétaire et au gérant. Les autres ne peuvent annuler que leur propre saisie récente, jamais modifiée.
+    if (!peutToutSupprimer(session.role)) {
+      const candidats = valides.filter((c) => c.deleted && avant.get(c.id) && avant.get(c.id)!.deleted !== 1);
+      const modifies = new Set<string>();
+      for (let i = 0; i < candidats.length; i += 90) {
+        const l = candidats.slice(i, i + 90);
+        const r = await env.DB.prepare(`SELECT DISTINCT record_id FROM journal WHERE record_id IN (${l.map(() => '?').join(',')})`).bind(...l.map((x) => x.id)).all<{ record_id: string }>();
+        for (const x of r.results) modifies.add(x.record_id);
+      }
+      const maintenantS = Date.now();
+      valides = valides.filter((c) => {
+        if (!candidats.includes(c)) return true;
+        const a = avant.get(c.id)!;
+        const permis = a.author === session.name && maintenantS - a.updated_at <= FENETRE_CORRECTION_MS && !modifies.has(c.id);
+        if (!permis) rejected.push(c.id);
+        return permis;
+      });
+    }
 
     const stmts: D1PreparedStatement[] = [];
     const maintenant = Date.now();
@@ -340,7 +359,7 @@ async function sync(req: Request, env: Env, session: Session): Promise<Response>
         ).bind(c.id, c.collection, data, c.updatedAt, c.deleted ? 1 : 0, session.name)
       );
     }
-    await env.DB.batch(stmts);
+    if (stmts.length) await env.DB.batch(stmts);
   }
 
   // lecture : seulement les collections permises au profil

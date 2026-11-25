@@ -1,7 +1,7 @@
 // Boutons « Modifier » et « Supprimer » d'une fiche, avec contrôle d'intégrité avant toute suppression.
 import { useState } from 'preact/hooks';
 import { listAll } from './db';
-import { peutEcrire } from './droits';
+import { peutEcrire, peutToutSupprimer } from './droits';
 import { dataOf, go, useRole, type Item } from './hooks';
 import { accompagnants, bloquants, grouper, messageBlocage, type Groupes } from './integrite';
 import { saveRecord } from './sync';
@@ -91,7 +91,7 @@ export function ActionsFiche({ collection, item, nom, champs, retour, valider, c
       {mode !== 'modifier' && (
         <div class="ligne-actions">
           <button type="button" class="lien vert" onClick={() => void ouvrir()}>Modifier</button>
-          <button type="button" class="lien danger-lien" onClick={() => void supprimer()}>Supprimer</button>
+          {peutToutSupprimer(role) && <button type="button" class="lien danger-lien" onClick={() => void supprimer()}>Supprimer</button>}
         </div>
       )}
       {mode === 'modifier' && (

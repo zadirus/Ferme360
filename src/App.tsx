@@ -3,9 +3,10 @@ import { Auth } from './Auth';
 import { Carnet } from './Carnet';
 import { StatusBar } from './StatusBar';
 import { prechauffer, useHash, useItems, useRole } from './hooks';
-import { peut } from './droits';
+import { peut, peutToutSupprimer } from './droits';
 import { appliquerReglages, ID_REGLAGES, type Reglages as TypeReglages } from './reglages';
 import { Equipe, Journal, MotDePasse, Plus } from './pages/Admin';
+import { Corbeille } from './pages/Corbeille';
 import { Rapports } from './pages/Rapports';
 import { Notifications } from './pages/Notifications';
 import { Aide } from './pages/Aide';
@@ -50,6 +51,7 @@ const MENU_BUREAU: Array<{ section?: string; chemin: string; texte: string; icon
   { chemin: '/rapports', texte: 'Rapports', icone: '📄' },
   { section: 'Gestion', chemin: '/equipe', texte: 'Équipe et droits', icone: '👥' },
   { chemin: '/journal', texte: 'Journal', icone: '🕑' },
+  { chemin: '/corbeille', texte: 'Corbeille', icone: '🗑️' },
   { chemin: '/reglages', texte: 'Réglages', icone: '⚙️' },
   { chemin: '/import', texte: 'Reprendre mes données', icone: '📥' },
   { chemin: '/sauvegarde', texte: 'Sauvegarde', icone: '💾' },
@@ -64,7 +66,7 @@ const FAMILLES: Record<string, string[]> = {
   '/elevage': ['/elevage', '/poules', '/oeufs', '/moutons', '/boeufs', '/animaux', '/lots'],
   '/ventes': ['/ventes', '/clients'],
   '/stocks': ['/stocks'],
-  '/plus': ['/plus', '/argent', '/rapports', '/tableau', '/equipe', '/journal', '/reglages', '/sauvegarde', '/import', '/notifications', '/pin', '/mdp', '/aide', '/carnet']
+  '/plus': ['/plus', '/argent', '/rapports', '/tableau', '/equipe', '/journal', '/corbeille', '/reglages', '/sauvegarde', '/import', '/notifications', '/pin', '/mdp', '/aide', '/carnet']
 };
 
 // Accès aux pages selon le profil (le serveur applique de toute façon les mêmes droits)
@@ -76,6 +78,7 @@ function autorise(route: string, role: string): boolean {
   if (route === '/sauvegarde' || route === '/import') return peut(role, 'sauvegarde');
   if (route === '/equipe') return peut(role, 'equipe');
   if (route === '/journal') return peut(role, 'journal');
+  if (route === '/corbeille') return peutToutSupprimer(role);
   return true;
 }
 
@@ -144,6 +147,7 @@ export function App() {
   else if (route === '/plus') page = <Plus />;
   else if (route === '/equipe') page = <Equipe />;
   else if (route === '/journal') page = <Journal />;
+  else if (route === '/corbeille') page = <Corbeille />;
   else if (route === '/reglages') page = <Reglages />;
   else if (route === '/sauvegarde') page = <Sauvegarde />;
   else if (route === '/rapports') page = <Rapports />;

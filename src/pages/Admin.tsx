@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { NOM_ROLE, peut, ROLES_CREABLES, type Role } from '../droits';
+import { NOM_ROLE, peut, peutToutSupprimer, ROLES_CREABLES, type Role } from '../droits';
 import { fmtDate } from '../format';
 import { useRole } from '../hooks';
 import { LIBELLE_COLLECTION } from '../libelles';
@@ -32,6 +32,7 @@ export function Plus() {
         {peut(role, 'reglages') && lien('/reglages', '⚙️', 'Réglages', "Seuils d'alerte et valeurs par défaut")}
         {peut(role, 'equipe') && lien('/equipe', '👥', 'Équipe', 'Créer les comptes et choisir les droits')}
         {peut(role, 'journal') && lien('/journal', '🕑', 'Journal des modifications', 'Qui a modifié ou supprimé quoi')}
+        {peutToutSupprimer(role) && lien('/corbeille', '🗑️', 'Corbeille', 'Retrouver et restaurer ce qui a été supprimé')}
         {peut(role, 'sauvegarde') && lien('/import', '📥', 'Reprendre mes données', 'Importer animaux, clients, stock, bandes depuis Excel')}
         {peut(role, 'sauvegarde') && lien('/sauvegarde', '💾', 'Sauvegarde', 'Exporter ou restaurer toutes les données')}
         {lien('/aide', '❓', 'Aide', 'Mode d’emploi, par où commencer')}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { listAll, type Rec } from './db';
 import { getState, onData, subscribe } from './sync';
 
-export type Item<T> = T & { id: string; updatedAt: number; dirty: 0 | 1 };
+export type Item<T> = T & { id: string; updatedAt: number; dirty: 0 | 1; author?: string };
 
 // Toutes les données du téléphone sont rechargées ensemble : les écrans ne voient jamais un état à moitié à jour.
 let instantane = new Map<string, Item<unknown>[]>();
@@ -20,7 +20,7 @@ export function recharger(): Promise<void> {
       relance = false;
       const m = new Map<string, Item<unknown>[]>();
       for (const r of await listAll() as Rec[]) {
-        const item = { ...r.data, id: r.id, updatedAt: r.updatedAt, dirty: r.dirty } as Item<unknown>;
+        const item = { ...r.data, id: r.id, updatedAt: r.updatedAt, dirty: r.dirty, author: r.author } as Item<unknown>;
         const liste = m.get(r.collection);
         if (liste) liste.push(item);
         else m.set(r.collection, [item]);
@@ -55,7 +55,7 @@ export function useItems<T>(collection: string): Item<T>[] {
 
 // Données d'un élément, sans les champs techniques (pour le réenregistrer ou le supprimer)
 export function dataOf<T>(item: Item<T>): T {
-  const { id: _id, updatedAt: _u, dirty: _d, ...data } = item;
+  const { id: _id, updatedAt: _u, dirty: _d, author: _a, ...data } = item;
   return data as unknown as T;
 }
 

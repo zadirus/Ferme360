@@ -1,6 +1,7 @@
+import { getUser } from '../session';
 import { useState } from 'preact/hooks';
 import { dataOf, go, useItems, useRole, type Item } from '../hooks';
-import { peut, peutEcrire } from '../droits';
+import { peut, peutEcrire, peutSupprimerSaisie } from '../droits';
 import { ageEnMois, fmtDate, fmtDec, fmtFcfa, joursEntre, today } from '../format';
 import { COMPTES, type Compte, type Depense, type Paiement, type Vente } from '../gestion/types';
 import { CroissanceAnimal, fmtLitres, litresSur, PhotosAnimal, supprimerTravail, TraiteForm, TravailForm } from './RuminantsExtras';
@@ -21,7 +22,7 @@ import { Alertes, Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
 
 type Action = 'pesee' | 'soin' | 'repro' | 'misebas' | 'lot' | 'sortie' | 'traite' | 'travail';
 
-interface Evt { cle: string; date: string; maj: number; texte: string; supprimer?: () => Promise<void> }
+interface Evt { cle: string; date: string; maj: number; aut?: string; texte: string; supprimer?: () => Promise<void> }
 
 export function AnimalDetail({ id }: { id: string }) {
   const r = useRuminants();
@@ -58,13 +59,13 @@ export function AnimalDetail({ id }: { id: string }) {
   };
 
   const evts: Evt[] = [
-    ...r.pesees.filter((p) => p.animalId === id).map((p) => ({ cle: 'p' + p.id, date: p.date, maj: p.updatedAt, texte: `Pesée : ${fmtDec(p.poids, 1)} kg (${p.methode === 'balance' ? 'balance' : 'ruban'})`, supprimer: () => effacer('pesee', p, 'Supprimer cette pesée ?') })),
-    ...r.soins.filter((s) => s.animalId === id).map((s) => ({ cle: 's' + s.id, date: s.date, maj: s.updatedAt, texte: `${NOM_SOIN[s.type]} : ${s.produit}${s.delaiAttente ? ` · délai d'attente ${s.delaiAttente} j` : ''}${s.cout ? ` · ${fmtFcfa(s.cout)}` : ''}`,
+    ...r.pesees.filter((p) => p.animalId === id).map((p) => ({ cle: 'p' + p.id, date: p.date, maj: p.updatedAt, aut: p.author, texte: `Pesée : ${fmtDec(p.poids, 1)} kg (${p.methode === 'balance' ? 'balance' : 'ruban'})`, supprimer: () => effacer('pesee', p, 'Supprimer cette pesée ?') })),
+    ...r.soins.filter((s) => s.animalId === id).map((s) => ({ cle: 's' + s.id, date: s.date, maj: s.updatedAt, aut: s.author, texte: `${NOM_SOIN[s.type]} : ${s.produit}${s.delaiAttente ? ` · délai d'attente ${s.delaiAttente} j` : ''}${s.cout ? ` · ${fmtFcfa(s.cout)}` : ''}`,
       supprimer: () => effacer('soin', s, 'Supprimer ce soin, sa dépense et la sortie de stock liée ?', async () => { for (const d of r.depenses.filter((x) => x.soinId === s.id)) await saveRecord('depense', d.id, dataOf(d), true); for (const m of stockMvtsT.filter((x) => x.alimentId === s.id)) await saveRecord('stock_mvt', m.id, dataOf(m), true); }) })),
-    ...r.repro.filter((x) => x.femelleId === id).map((x) => ({ cle: 'r' + x.id, date: x.date, maj: x.updatedAt,
+    ...r.repro.filter((x) => x.femelleId === id).map((x) => ({ cle: 'r' + x.id, date: x.date, maj: x.updatedAt, aut: x.author,
       texte: x.type === 'chaleurs' ? 'Chaleurs' : x.type === 'saillie' ? `Saillie${x.maleId ? ` par ${nom(x.maleId)}` : ''}` : `Diagnostic de gestation : ${x.resultat === 'gestante' ? 'gestante' : 'vide'}`,
       supprimer: () => effacer('repro', x, 'Supprimer cette saisie ?') })),
-    ...r.misesBas.filter((m) => m.mereId === id).map((m) => ({ cle: 'b' + m.id, date: m.date, maj: m.updatedAt, texte: `Mise bas : ${m.vivants} vivant(s)${m.mortNes ? `, ${m.mortNes} mort-né(s)` : ''}`,
+    ...r.misesBas.filter((m) => m.mereId === id).map((m) => ({ cle: 'b' + m.id, date: m.date, maj: m.updatedAt, aut: m.author, texte: `Mise bas : ${m.vivants} vivant(s)${m.mortNes ? `, ${m.mortNes} mort-né(s)` : ''}`,
       supprimer: () => effacer('misebas', m, 'Supprimer cette mise bas ET les fiches des petits créés ?', async () => {
         for (const p of r.animaux.filter((x) => x.miseBasId === m.id)) {
           await saveRecord('animal', p.id, dataOf(p), true);
@@ -72,9 +73,9 @@ export function AnimalDetail({ id }: { id: string }) {
           for (const v of r.pesees.filter((x) => x.animalId === p.id)) await saveRecord('pesee', v.id, dataOf(v), true);
         }
       }) })),
-    ...r.traites.filter((t) => t.animalId === id).map((t) => ({ cle: 't' + t.id, date: t.date, maj: t.updatedAt, texte: `Traite : ${fmtDec(t.litres, 1)} L`, supprimer: () => effacer('traite', t, 'Supprimer cette traite ?') })),
-    ...r.travaux.filter((t) => t.animalId === id).map((t) => ({ cle: 'w' + t.id, date: t.date, maj: t.updatedAt, texte: `Travail : ${fmtDec(t.jours, 1)} j${t.recette ? ` · recette ${fmtFcfa(t.recette)}` : ''}`, supprimer: async () => { if (!window.confirm('Supprimer ce travail (et la recette liée) ?')) return; await supprimerTravail(t, ventesT, paiementsT); setMessage('Saisie supprimée'); } })),
-    ...r.mvts.filter((m) => m.animalId === id).map((m) => ({ cle: 'm' + m.id, date: m.date, maj: m.updatedAt,
+    ...r.traites.filter((t) => t.animalId === id).map((t) => ({ cle: 't' + t.id, date: t.date, maj: t.updatedAt, aut: t.author, texte: `Traite : ${fmtDec(t.litres, 1)} L`, supprimer: () => effacer('traite', t, 'Supprimer cette traite ?') })),
+    ...r.travaux.filter((t) => t.animalId === id).map((t) => ({ cle: 'w' + t.id, date: t.date, maj: t.updatedAt, aut: t.author, texte: `Travail : ${fmtDec(t.jours, 1)} j${t.recette ? ` · recette ${fmtFcfa(t.recette)}` : ''}`, supprimer: async () => { if (!window.confirm('Supprimer ce travail (et la recette liée) ?')) return; await supprimerTravail(t, ventesT, paiementsT); setMessage('Saisie supprimée'); } })),
+    ...r.mvts.filter((m) => m.animalId === id).map((m) => ({ cle: 'm' + m.id, date: m.date, maj: m.updatedAt, aut: m.author,
       texte: m.type === 'entree' ? (m.motif === 'achat' ? 'Entrée : achat' : 'Entrée : naissance') : m.type === 'lot' ? `Changement de lot${m.lotId ? ` : ${r.lots.find((l) => l.id === m.lotId)?.nom ?? ''}` : ' : aucun lot'}` : `Sortie : ${m.motif}`,
       supprimer: m.type === 'entree' || m.venteId ? undefined : () => effacer('mvt_animal', m, 'Annuler ce mouvement ?') }))
   ].sort((x, y) => y.date.localeCompare(x.date) || y.maj - x.maj);
@@ -166,7 +167,7 @@ export function AnimalDetail({ id }: { id: string }) {
         {evts.map((e) => (
           <li key={e.cle}>
             <div class="ligne"><span>{e.texte}</span><small>{fmtDate(e.date)}</small></div>
-            {e.supprimer && ecrit({ p: 'pesee', s: 'soin', r: 'repro', b: 'misebas', m: 'mvt_animal', t: 'traite', w: 'travail' }[e.cle[0]] ?? '') && <button type="button" class="lien" onClick={() => void e.supprimer!()}>Supprimer</button>}
+            {e.supprimer && peutSupprimerSaisie(role, e.maj, e.aut, getUser()?.name) && ecrit({ p: 'pesee', s: 'soin', r: 'repro', b: 'misebas', m: 'mvt_animal', t: 'traite', w: 'travail' }[e.cle[0]] ?? '') && <button type="button" class="lien" onClick={() => void e.supprimer!()}>Supprimer</button>}
           </li>
         ))}
         {evts.length === 0 && <li class="vide">Aucune saisie.</li>}

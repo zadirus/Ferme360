@@ -1,7 +1,9 @@
+import { getUser } from '../session';
 import { useState } from 'preact/hooks';
 import { Courbe } from '../courbe';
 import { ajouteJours, fmtDate, fmtDec, fmtFcfa, joursEntre, today } from '../format';
-import { dataOf, useItems, type Item } from '../hooks';
+import { dataOf, useItems, useRole, type Item } from '../hooks';
+import { peutSupprimerSaisie } from '../droits';
 import { compresserPhoto } from '../photo';
 import { propositionsReforme, tachesAutomatiques } from '../ruminants/calculs';
 import { libelleAnimal, useRuminants } from '../ruminants/donnees';
@@ -12,6 +14,7 @@ import { newId, saveRecord } from '../sync';
 import { Boutons, Champ, Choix, nombre } from '../ui';
 
 export function PhotosAnimal({ animalId, peutAjouter }: { animalId: string; peutAjouter: boolean }) {
+  const role = useRole();
   const photos = useItems<Photo>('photo').filter((p) => p.animalId === animalId).sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
   const [erreur, setErreur] = useState('');
   const [grande, setGrande] = useState<string | null>(null);
@@ -36,7 +39,7 @@ export function PhotosAnimal({ animalId, peutAjouter }: { animalId: string; peut
         {photos.map((p) => (
           <figure key={p.id} class={grande === p.id ? 'grande' : ''}>
             <img src={p.image} alt={`Photo du ${fmtDate(p.date)}`} onClick={() => setGrande(grande === p.id ? null : p.id)} />
-            <figcaption>{fmtDate(p.date)}{peutAjouter && <button type="button" class="lien" onClick={async () => { if (window.confirm('Supprimer cette photo ?')) await saveRecord('photo', p.id, dataOf(p), true); }}>Supprimer</button>}</figcaption>
+            <figcaption>{fmtDate(p.date)}{peutAjouter && peutSupprimerSaisie(role, p.updatedAt, p.author, getUser()?.name) && <button type="button" class="lien" onClick={async () => { if (window.confirm('Supprimer cette photo ?')) await saveRecord('photo', p.id, dataOf(p), true); }}>Supprimer</button>}</figcaption>
           </figure>
         ))}
       </div>

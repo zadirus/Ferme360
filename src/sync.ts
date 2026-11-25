@@ -126,10 +126,17 @@ export async function syncNow(): Promise<void> {
         }
       }
       // saisies refusées par le serveur (droits) : on ne les renvoie plus
+      let refusees = 0;
       for (const id of res.rejected ?? []) {
         const local = await getRecord(id);
-        if (local) await putRecord({ ...local, dirty: 0 });
+        if (!local) continue;
+        if (local.deleted) {
+          // suppression refusée (saisie validée) : la saisie réapparaît
+          await putRecord({ ...local, deleted: false, dirty: 0 });
+          refusees += 1;
+        } else await putRecord({ ...local, dirty: 0 });
       }
+      if (refusees > 0) set({ error: 'Suppression refusée : seul le gérant peut supprimer une saisie déjà validée. Demandez-lui, ou corrigez par une nouvelle saisie.' });
       // une saisie modifiée pendant l'envoi reste « en attente »
       for (const p of pushed) {
         const local = await getRecord(p.id);
