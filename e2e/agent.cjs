@@ -50,21 +50,23 @@ const attendre = async (token, test, ms = 10000) => { const fin = Date.now() + m
   // ramassage rétrosaisie
   await A.goto(BASE + '/#/saisie/oeufs');
   await A.locator('input[type=date]').fill(jour(2));
-  await A.getByRole('spinbutton', { name: 'Bons œufs' }).fill('321');
-  await A.getByRole('spinbutton', { name: 'Œufs fêlés' }).fill('3');
+  await A.getByRole('spinbutton', { name: 'Plateaux complets de bons œufs' }).fill('10');
+  await A.getByRole('spinbutton', { name: /Bons œufs en plus/ }).fill('21');
+  await A.getByRole('spinbutton', { name: 'Œufs cassés' }).fill('3');
+  ok(await A.getByText('10 plateaux et 21 œufs').first().isVisible(), 'ramassage : 10 plateaux + 21 œufs = « 10 plateaux et 21 œufs »');
   ok(await A.getByText(/faite après coup/).isVisible(), 'ramassage : une date passée est signalée « faite après coup »');
   await clic(A, 'Enregistrer').click();
   await A.getByText('Ramassage enregistré').waitFor();
   let s = await attendre(owner, (x) => x.some((r) => r.collection === 'ramassage'));
   const ram = s.find((r) => r.collection === 'ramassage');
-  ok(ram && ram.data.date === jour(2) && ram.data.bons === 321 && ram.data.feles === 3, 'ramassage : enregistré à la date choisie (rétrosaisie)');
+  ok(ram && ram.data.date === jour(2) && ram.data.bons === 321 && ram.data.casses === 3, 'ramassage : 321 bons œufs (10 plateaux de 30 + 21) et 3 cassés, à la date choisie');
 
   // « Faire une autre saisie » repart d'un formulaire vide
   await clic(A, 'Faire une autre saisie').click();
-  ok((await A.getByRole('spinbutton', { name: 'Bons œufs' }).inputValue()) === '', 'après un enregistrement, « Faire une autre saisie » ouvre un formulaire vide');
+  ok((await A.getByRole('spinbutton', { name: 'Plateaux complets de bons œufs' }).inputValue()) === '', 'après un enregistrement, « Faire une autre saisie » ouvre un formulaire vide');
   // liste sur sa propre page
   await A.getByRole('link', { name: /Liste/ }).click();
-  await A.getByText(/321 bons/).waitFor();
+  await A.getByText(/10 plateaux et 21 œufs/).waitFor();
   ok(await A.getByRole('heading', { name: 'Liste : Œufs' }).isVisible(), 'bouton « Liste » : la liste s’ouvre sur sa propre page');
 
   // décès : cause libre, réutilisée ensuite

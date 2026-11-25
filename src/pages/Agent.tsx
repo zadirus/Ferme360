@@ -3,7 +3,7 @@ import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import { peutSupprimerSaisie } from '../droits';
 import { dataOf, go, useItems, useRole, type Item } from '../hooks';
-import { fmtDate, fmtInt, fmtQte, today } from '../format';
+import { fmtDate, fmtInt, fmtQte, OEUFS_PAR_PLATEAU, today } from '../format';
 import { coutMoyen } from '../gestion/calculs';
 import type { Achat, Article, StockMvt } from '../gestion/types';
 import { effectifActuel } from '../poules/calculs';
@@ -105,6 +105,13 @@ const AucuneBande = () => <p class="intro">Aucune bande de poules n’est enregi
 // ---------- listes des saisies ----------
 
 type Type = 'oeufs' | 'deces' | 'aliment' | 'pesee' | 'soin';
+// 338 œufs = « 11 plateaux et 8 œufs »
+const libelleBons = (n: number) => {
+  const pl = Math.floor(n / OEUFS_PAR_PLATEAU);
+  const reste = n % OEUFS_PAR_PLATEAU;
+  return [pl > 0 ? `${fmtInt(pl)} plateau${pl > 1 ? 'x' : ''}` : '', reste > 0 || pl === 0 ? `${fmtInt(reste)} œuf${reste > 1 ? 's' : ''}` : ''].filter(Boolean).join(' et ');
+};
+
 const NOM_TYPE: Record<Type, string> = { oeufs: 'Œufs', deces: 'Décès', aliment: 'Aliment', pesee: 'Pesées', soin: 'Médicaments' };
 
 interface LigneSaisie { cle: string; type: Type; date: string; maj: number; auteur?: string; collection: string; item: Item<object>; texte: string }
@@ -123,7 +130,7 @@ function useSaisies(): LigneSaisie[] {
   const lot = (id: string) => r.lots.find((l) => l.id === id)?.nom ?? 'Lot';
   const ligne = (type: Type, collection: string, x: Item<{ date: string }>, texte: string): LigneSaisie => ({ cle: x.id, type, date: x.date, maj: x.updatedAt, auteur: x.author, collection, item: x, texte });
   return [
-    ...ram.map((x) => ligne('oeufs', 'ramassage', x, `🥚 ${fmtInt(x.bons)} bons · ${fmtInt(x.feles)} fêlés · ${fmtInt(x.casses)} cassés · ${bande(x.bandeId)}`)),
+    ...ram.map((x) => ligne('oeufs', 'ramassage', x, `🥚 ${libelleBons(x.bons)}${x.feles > 0 ? ` · ${fmtInt(x.feles)} fêlés` : ''} · ${fmtInt(x.casses)} cassés · ${bande(x.bandeId)}`)),
     ...morts.map((x) => ligne('deces', 'mortalite', x, `💀 ${fmtInt(x.nombre)} poule(s)${x.cause ? ` · ${x.cause}` : ''} · ${bande(x.bandeId)}`)),
     ...aliments.map((x) => ligne('aliment', 'aliment', x, `🌾 ${x.sacs ? `${fmtQte(x.sacs)} sac(s) = ` : ''}${fmtQte(x.kg)} kg · ${bande(x.bandeId)}`)),
     ...pesees.map((x) => ligne('pesee', 'pesee', x, `⚖️ ${animal(x.animalId)} · ${fmtQte(x.poids)} kg`)),
@@ -246,19 +253,23 @@ function SaisieOeufsEcran({ relancer }: { relancer: () => void }) {
   const { bandes, bande, selecteur } = useBande();
   const ram = useItems<Ramassage>('ramassage');
   const [date, setDate] = useState(today());
-  const [bons, setBons] = useState(0);
-  const [feles, setFeles] = useState(0);
+  const [plateaux, setPlateaux] = useState(0);
+  const [vrac, setVrac] = useState(0);
   const [casses, setCasses] = useState(0);
   const [fait, setFait] = useState('');
   if (fait) return <Fait titre="Ramassage enregistré" detail={fait} onEncore={relancer} />;
-  const total = bons + feles + casses;
+  const bons = plateaux * OEUFS_PAR_PLATEAU + vrac;
+  // 30 œufs en vrac ou plus : ils forment un plateau de plus
+  const changerVrac = (n: number) => {
+    if (n >= OEUFS_PAR_PLATEAU) { setPlateaux(plateaux + Math.floor(n / OEUFS_PAR_PLATEAU)); setVrac(n % OEUFS_PAR_PLATEAU); } else setVrac(n);
+  };
   async function envoyer(e: Event) {
     e.preventDefault();
-    if (!bande || total <= 0) return;
+    if (!bande || bons + casses <= 0) return;
     const deja = ram.filter((r) => r.bandeId === bande.id && r.date === date);
     if (deja.length > 0 && !window.confirm(`Un ramassage existe déjà le ${fmtDate(date)} pour ${bande.nom} (${fmtInt(deja.reduce((s, r) => s + r.bons + r.feles + r.casses, 0))} œufs). Ajouter celui-ci en plus ?`)) return;
-    await saveRecord('ramassage', newId(), { bandeId: bande.id, date, bons, feles, casses } satisfies Ramassage);
-    setFait(`${fmtInt(total)} œufs enregistrés pour ${bande.nom} le ${fmtDate(date)} (dont ${fmtInt(bons)} bons).`);
+    await saveRecord('ramassage', newId(), { bandeId: bande.id, date, bons, feles: 0, casses } satisfies Ramassage);
+    setFait(`${bande.nom}, le ${fmtDate(date)} : ${libelleBons(bons)}${casses > 0 ? `, ${fmtInt(casses)} œuf(s) cassé(s)` : ''}.`);
   }
   return (
     <section class="agent">
@@ -267,11 +278,14 @@ function SaisieOeufsEcran({ relancer }: { relancer: () => void }) {
         <form class="formulaire" onSubmit={envoyer}>
           <ChampDate valeur={date} onChange={setDate} />
           {selecteur}
-          <Compteur label="Bons œufs" valeur={bons} onChange={setBons} pas={10} />
-          <Compteur label="Œufs fêlés" valeur={feles} onChange={setFeles} />
-          <Compteur label="Œufs cassés" valeur={casses} onChange={setCasses} />
-          <p class="total-saisie">Total : <strong>{fmtInt(total)}</strong> œufs</p>
-          <button class="principal gros" type="submit" disabled={!bande || total <= 0}>Enregistrer</button>
+          <Compteur label="Plateaux complets de bons œufs" valeur={plateaux} onChange={setPlateaux} suffixe="plateaux" />
+          <Compteur label={`Bons œufs en plus (moins de ${OEUFS_PAR_PLATEAU})`} valeur={vrac} onChange={changerVrac} suffixe="œufs" />
+          <Compteur label="Œufs cassés" valeur={casses} onChange={setCasses} suffixe="œufs" />
+          <div class="recap-oeufs">
+            <div><strong>{libelleBons(bons)}</strong><span>bons œufs</span></div>
+            <div><strong>{fmtInt(casses)}</strong><span>cassés</span></div>
+          </div>
+          <button class="principal gros" type="submit" disabled={!bande || bons + casses <= 0}>Enregistrer</button>
         </form>
       )}
     </section>
