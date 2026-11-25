@@ -77,10 +77,13 @@ function Fait({ titre, detail, encore }: { titre: string; detail: string; encore
   );
 }
 
-const Titre = ({ icone, texte }: { icone: string; texte: string }) => (
+const Titre = ({ icone, texte, liste }: { icone: string; texte: string; liste?: Type }) => (
   <>
     <a class="retour" href="#/">← Accueil</a>
-    <h2 class="titre-saisie"><span aria-hidden="true">{icone}</span> {texte}</h2>
+    <div class="entete-saisie">
+      <h2 class="titre-saisie"><span aria-hidden="true">{icone}</span> {texte}</h2>
+      {liste && <a class="bouton-liste" href={`#/saisie/liste/${liste}`}>📋 Liste</a>}
+    </div>
   </>
 );
 
@@ -128,41 +131,59 @@ function useSaisies(): LigneSaisie[] {
   ].sort((a, b) => b.date.localeCompare(a.date) || b.maj - a.maj);
 }
 
-function ListeSaisies({ types, limite, titre }: { types: Type[]; limite: number; titre: string }) {
+function ListeSaisies({ types, pas = 25 }: { types: Type[]; pas?: number }) {
   const role = useRole();
   const moi = getUser()?.name;
-  const lignes = useSaisies().filter((l) => types.includes(l.type)).slice(0, limite);
+  const [nb, setNb] = useState(pas);
+  const toutes = useSaisies().filter((l) => types.includes(l.type));
+  const lignes = toutes.slice(0, nb);
+  const hier = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+  const titreJour = (d: string) => (d === today() ? 'Aujourd’hui' : d === hier ? 'Hier' : fmtDate(d));
+  const jours = [...new Set(lignes.map((l) => l.date))];
   return (
     <>
-      <h3>{titre}</h3>
-      <ul class="saisies-jour">
-        {lignes.map((l) => (
-          <li key={l.cle}>
-            <div>
-              <span>{l.texte}</span>
-              <small>{fmtDate(l.date)}{l.auteur ? ` · ${l.auteur.split(' ')[0]}` : ''}</small>
-            </div>
-            {peutSupprimerSaisie(role, l.maj, l.auteur, moi) && (
-              <button type="button" class="lien" onClick={async () => { if (window.confirm('Annuler cette saisie ?')) await saveRecord(l.collection, l.cle, dataOf(l.item), true); }}>Annuler</button>
-            )}
-          </li>
-        ))}
-        {lignes.length === 0 && <li class="vide">Aucune saisie pour l’instant.</li>}
-      </ul>
+      {jours.map((j) => (
+        <div key={j}>
+          <h3 class="jour">{titreJour(j)}</h3>
+          <ul class="saisies-jour">
+            {lignes.filter((l) => l.date === j).map((l) => (
+              <li key={l.cle}>
+                <div>
+                  <span>{l.texte}</span>
+                  {l.auteur && <small>{l.auteur.split(' ')[0]}</small>}
+                </div>
+                {peutSupprimerSaisie(role, l.maj, l.auteur, moi) && (
+                  <button type="button" class="lien" onClick={async () => { if (window.confirm('Annuler cette saisie ?')) await saveRecord(l.collection, l.cle, dataOf(l.item), true); }}>Annuler</button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      {toutes.length === 0 && <p class="intro">Aucune saisie pour l’instant.</p>}
+      {toutes.length > nb && <button type="button" class="secondaire gros" onClick={() => setNb(nb + pas)}>Voir plus ({toutes.length - nb} autres)</button>}
     </>
   );
 }
 
-export function SaisieHistorique() {
-  const [filtre, setFiltre] = useState<Type | 'tout'>('tout');
+const SAISIE_DE: Record<Type, string> = { oeufs: 'oeufs', deces: 'deces', aliment: 'aliment', pesee: 'pesee', soin: 'soin' };
+
+// La liste des saisies : un seul type (bouton « Liste » d'un écran de saisie) ou toutes (« Voir mes saisies »)
+export function SaisieHistorique({ type }: { type?: Type }) {
+  const role = useRole();
+  const permis: Type[] = role === 'veterinaire' ? ['soin', 'pesee'] : ['oeufs', 'deces', 'aliment', 'pesee', 'soin'];
+  const [filtre, setFiltre] = useState<Type | 'tout'>(type && permis.includes(type) ? type : 'tout');
   return (
     <section class="agent">
-      <Titre icone="📋" texte="Mes saisies" />
-      <div class="choix-ligne filtre-types" role="group" aria-label="Type de saisie">
-        <button type="button" class={filtre === 'tout' ? 'actif' : ''} onClick={() => setFiltre('tout')}>Tout</button>
-        {(Object.keys(NOM_TYPE) as Type[]).map((t) => <button type="button" key={t} class={filtre === t ? 'actif' : ''} onClick={() => setFiltre(t)}>{NOM_TYPE[t]}</button>)}
-      </div>
-      <ListeSaisies types={filtre === 'tout' ? (Object.keys(NOM_TYPE) as Type[]) : [filtre]} limite={60} titre="Dernières saisies" />
+      <a class="retour" href={type ? `#/saisie/${SAISIE_DE[type]}` : '#/'}>← {type ? NOM_TYPE[type] : 'Accueil'}</a>
+      <h2 class="titre-saisie"><span aria-hidden="true">📋</span> {type ? `Liste : ${NOM_TYPE[type]}` : 'Mes saisies'}</h2>
+      {!type && permis.length > 1 && (
+        <div class="choix-ligne filtre-types" role="group" aria-label="Type de saisie">
+          <button type="button" class={filtre === 'tout' ? 'actif' : ''} onClick={() => setFiltre('tout')}>Tout</button>
+          {permis.map((t) => <button type="button" key={t} class={filtre === t ? 'actif' : ''} onClick={() => setFiltre(t)}>{NOM_TYPE[t]}</button>)}
+        </div>
+      )}
+      <ListeSaisies key={filtre} types={filtre === 'tout' ? permis : [filtre]} />
       <p class="intro petit-texte">Une erreur ? Vous pouvez annuler votre saisie pendant 2 heures. Après, demandez au gérant.</p>
     </section>
   );
@@ -207,8 +228,7 @@ export function AccueilAgent() {
         <div><strong>{fmtInt(effectif)}</strong><span>poules présentes</span></div>
       </div>
 
-      <ListeSaisies types={['oeufs', 'deces', 'aliment', 'pesee', 'soin']} limite={5} titre="Dernières saisies" />
-      <a class="lien-liste" href="#/saisie/historique">Voir toutes mes saisies →</a>
+      <a class="bouton-liste large" href="#/saisie/historique">📋 Voir mes saisies</a>
     </section>
   );
 }
@@ -235,7 +255,7 @@ export function SaisieOeufs() {
   }
   return (
     <section class="agent">
-      <Titre icone="🥚" texte="Ramasser les œufs" />
+      <Titre icone="🥚" texte="Ramasser les œufs" liste="oeufs" />
       {bandes.length === 0 ? <AucuneBande /> : (
         <form class="formulaire" onSubmit={envoyer}>
           <ChampDate valeur={date} onChange={setDate} />
@@ -247,7 +267,6 @@ export function SaisieOeufs() {
           <button class="principal gros" type="submit" disabled={!bande || total <= 0}>Enregistrer</button>
         </form>
       )}
-      <ListeSaisies types={['oeufs']} limite={10} titre="Derniers ramassages" />
     </section>
   );
 }
@@ -281,7 +300,7 @@ export function SaisieDeces() {
   }
   return (
     <section class="agent">
-      <Titre icone="💀" texte="Signaler un décès" />
+      <Titre icone="💀" texte="Signaler un décès" liste="deces" />
       {bandes.length === 0 ? <AucuneBande /> : (
         <form class="formulaire" onSubmit={envoyer}>
           <ChampDate valeur={date} onChange={setDate} />
@@ -299,7 +318,6 @@ export function SaisieDeces() {
           <button class="principal gros" type="submit" disabled={!bande || n <= 0}>Enregistrer</button>
         </form>
       )}
-      <ListeSaisies types={['deces']} limite={10} titre="Derniers décès" />
     </section>
   );
 }
@@ -336,7 +354,7 @@ export function SaisieAliment() {
   }
   return (
     <section class="agent">
-      <Titre icone="🌾" texte="Distribuer l’aliment" />
+      <Titre icone="🌾" texte="Distribuer l’aliment" liste="aliment" />
       {bandes.length === 0 ? <AucuneBande /> : (
         <form class="formulaire" onSubmit={envoyer}>
           <ChampDate valeur={date} onChange={setDate} />
@@ -353,7 +371,6 @@ export function SaisieAliment() {
           <button class="principal gros" type="submit" disabled={!bande || kg <= 0}>Enregistrer</button>
         </form>
       )}
-      <ListeSaisies types={['aliment']} limite={10} titre="Dernières distributions" />
     </section>
   );
 }
@@ -378,7 +395,7 @@ export function SaisiePesee() {
   }
   return (
     <section class="agent">
-      <Titre icone="⚖️" texte="Peser un animal" />
+      <Titre icone="⚖️" texte="Peser un animal" liste="pesee" />
       {!animal ? (
         <>
           <input type="search" class="recherche-gros" placeholder="Numéro de boucle ou nom" value={recherche} onInput={(e) => setRecherche(e.currentTarget.value)} />
@@ -397,13 +414,13 @@ export function SaisiePesee() {
           <button class="principal gros" type="submit" disabled={poids <= 0}>Enregistrer</button>
         </form>
       )}
-      <ListeSaisies types={['pesee']} limite={10} titre="Dernières pesées" />
     </section>
   );
 }
 
 // Soigner : vaccin ou médicament donné aux poules, à un animal ou à un lot ; le produit est retiré du stock
 export function SaisieSoin() {
+  const role = useRole();
   const bandes = useItems<Bande>('bande').filter((b) => !b.cloturee);
   const r = useRuminants();
   const produits = useItems<Article>('article').filter((a) => a.categorie === 'medicament');
@@ -450,7 +467,7 @@ export function SaisieSoin() {
       const t: Sante['type'] = type === 'vaccin' ? 'vaccin' : type === 'traitement' ? 'traitement' : 'autre';
       await saveRecord('sante', id, { bandeId: bande!.id, date, type: t, produit, note: note.trim(), rappel } satisfies Sante);
     } else {
-      await saveRecord('soin', id, { animalId: cible === 'animal' ? animal!.id : '', lotId: cible === 'lot' ? lot!.id : '', date, type, produit, veterinaire: '', cout: 0, delaiAttente: Math.max(0, Math.floor(delai)), rappel, note: note.trim() } satisfies Soin);
+      await saveRecord('soin', id, { animalId: cible === 'animal' ? animal!.id : '', lotId: cible === 'lot' ? lot!.id : '', date, type, produit, veterinaire: role === 'veterinaire' ? (getUser()?.name ?? '') : '', cout: 0, delaiAttente: Math.max(0, Math.floor(delai)), rappel, note: note.trim() } satisfies Soin);
     }
     if (article && qte > 0) {
       await saveRecord('stock_mvt', newId(), { articleId: article.id, date, type: 'sortie', quantite: qte, peremption: '', achatId: '', alimentId: id, note: `Soin : ${produit} (${nomCible})` } satisfies StockMvt);
@@ -460,7 +477,7 @@ export function SaisieSoin() {
 
   return (
     <section class="agent">
-      <Titre icone="💊" texte="Soigner, donner un médicament" />
+      <Titre icone="💊" texte="Soigner, donner un médicament" liste="soin" />
       <form class="formulaire" onSubmit={envoyer}>
         <ChampDate valeur={date} onChange={setDate} />
         <Pastilles label="Qui est soigné ?" valeur={cible} options={[['poules', '🐔 Poules'], ['animal', '🐑 Un animal'], ['lot', 'Un lot']]} onChange={setCible} />
@@ -484,7 +501,44 @@ export function SaisieSoin() {
         {erreur && <p class="erreur">{erreur}</p>}
         <button class="principal gros" type="submit" disabled={!cibleChoisie}>Enregistrer</button>
       </form>
-      <ListeSaisies types={['soin']} limite={10} titre="Derniers soins" />
+    </section>
+  );
+}
+
+// ---------- accueil du vétérinaire ----------
+
+export function AccueilVeto() {
+  const alertes = useAlertes();
+  const santes = useItems<Sante>('sante');
+  const soins = useItems<Soin>('soin');
+  const prenom = (getUser()?.name ?? '').split(' ')[0];
+  const dateLongue = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  const mois = today().slice(0, 7);
+  const nbMois = [...santes, ...soins].filter((x) => x.date.startsWith(mois)).length;
+  const dans14 = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
+  const rappels = [...santes, ...soins].filter((x) => x.rappel && x.rappel >= today() && x.rappel <= dans14).length;
+  const bouton = (href: string, ico: string, texte: string, classe = '') => (
+    <li><a class={`gros-bouton ${classe}`} href={`#${href}`}><span class="ico" aria-hidden="true">{ico}</span><span>{texte}</span></a></li>
+  );
+  return (
+    <section class="agent">
+      <div class="salut">
+        <strong>Bonjour{prenom ? `, ${prenom}` : ''}</strong>
+        <span>{dateLongue}</span>
+      </div>
+      <Alertes liste={alertes.map((a) => a.texte)} />
+      <ul class="gros-boutons">
+        {bouton('/saisie/soin', '💊', 'Soigner, donner un médicament', 'soin')}
+        {bouton('/saisie/liste/soin', '📋', 'Mes soins')}
+        {bouton('/saisie/pesee', '⚖️', 'Peser un animal', 'pesee')}
+        {bouton('/stocks', '📦', 'Stock de médicaments')}
+        {bouton('/elevage', '🐑', 'Animaux et poules')}
+        {bouton('/carnet', '📒', 'Ajouter une note', 'note')}
+      </ul>
+      <div class="resume-jour">
+        <div><strong>{fmtInt(nbMois)}</strong><span>soins ce mois-ci</span></div>
+        <div><strong>{fmtInt(rappels)}</strong><span>rappels dans les 14 jours</span></div>
+      </div>
     </section>
   );
 }

@@ -7,7 +7,7 @@ import { peut, peutToutSupprimer } from './droits';
 import { appliquerReglages, ID_REGLAGES, type Reglages as TypeReglages } from './reglages';
 import { Equipe, Journal, MotDePasse, Plus } from './pages/Admin';
 import { Corbeille } from './pages/Corbeille';
-import { AccueilAgent, SaisieAliment, SaisieDeces, SaisieHistorique, SaisieOeufs, SaisiePesee, SaisieSoin } from './pages/Agent';
+import { AccueilAgent, AccueilVeto, SaisieAliment, SaisieDeces, SaisieHistorique, SaisieOeufs, SaisiePesee, SaisieSoin } from './pages/Agent';
 import { Rapports } from './pages/Rapports';
 import { Notifications } from './pages/Notifications';
 import { Aide } from './pages/Aide';
@@ -80,7 +80,7 @@ function autorise(route: string, role: string): boolean {
   if (route === '/equipe') return peut(role, 'equipe');
   if (route === '/journal') return peut(role, 'journal');
   if (route === '/tableau') return role !== 'ouvrier';
-  if (route.startsWith('/saisie/')) return role === 'ouvrier';
+  if (route.startsWith('/saisie/')) return role === 'ouvrier' || (role === 'veterinaire' && ['/saisie/soin', '/saisie/pesee', '/saisie/historique', '/saisie/liste/soin', '/saisie/liste/pesee'].includes(route));
   if (route === '/corbeille') return peutToutSupprimer(role);
   return true;
 }
@@ -166,7 +166,8 @@ export function App() {
   else if (route === '/saisie/pesee') page = <SaisiePesee />;
   else if (route === '/saisie/soin') page = <SaisieSoin />;
   else if (route === '/saisie/historique') page = <SaisieHistorique />;
-  else page = role === 'ouvrier' ? <AccueilAgent /> : <Accueil />;
+  else if (route.startsWith('/saisie/liste/')) page = <SaisieHistorique key={route} type={route.slice('/saisie/liste/'.length) as 'oeufs' | 'deces' | 'aliment' | 'pesee' | 'soin'} />;
+  else page = role === 'ouvrier' ? <AccueilAgent /> : role === 'veterinaire' ? <AccueilVeto /> : <Accueil />;
 
   const actif = (p: string) => (p === '/' ? route === '/' : (FAMILLES[p] ?? [p]).some((x) => route.startsWith(x)));
   const actifBureau = (p: string) => (p === '/' ? route === '/' : (FAMILLES[p] ?? [p]).some((x) => route.startsWith(x)));

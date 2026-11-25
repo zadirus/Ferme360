@@ -71,6 +71,6 @@ const GESTIONNAIRES: Role[] = ['owner', 'gerant'];
 export function peut(role: string, c: Capacite): boolean {
   if (!connu(role)) return false;
   if (c === 'equipe' || c === 'journal') return role === 'owner';
-  if (c === 'stocks') return role !== 'veterinaire';
+  if (c === 'stocks') return true; // le vétérinaire consulte aussi le stock de produits qu'il utilise (sans argent)
   return GESTIONNAIRES.includes(role); // argent, achats, reglages, rapports, sauvegarde
 }

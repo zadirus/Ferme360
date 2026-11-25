@@ -280,3 +280,8 @@ button.gros, button.principal.gros { min-height: 62px; font-size: 1.15rem; borde
 .saisies-jour li > div { display: grid; gap: 2px; }
 .saisies-jour small { color: var(--gris); }
 .filtre-types { margin: 6px 0 4px; }
+.entete-saisie { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0 14px; }
+.entete-saisie .titre-saisie { margin: 0; }
+.bouton-liste { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 48px; padding: 0 16px; border-radius: 14px; background: var(--carte); border: 2px solid var(--trait); color: var(--vert-fonce); font-weight: 800; text-decoration: none; box-shadow: var(--ombre); }
+.bouton-liste.large { display: flex; justify-content: center; margin: 12px 0 18px; min-height: 56px; font-size: 1.05rem; }
+h3.jour { margin: 18px 0 6px; font-size: .95rem; color: var(--vert-fonce); text-transform: uppercase; letter-spacing: .03em; }
