@@ -290,3 +290,13 @@ h3.jour { margin: 18px 0 6px; font-size: .95rem; color: var(--vert-fonce); text-
 .recap-oeufs div + div { background: var(--terre-clair); }
 .recap-oeufs strong { display: block; font-size: 1.35rem; color: var(--vert-fonce); }
 .recap-oeufs span { color: var(--gris); font-size: .86rem; }
+
+/* Historique des modifications */
+.filtres-journal { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+ul.diffs { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
+ul.diffs li { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: baseline; padding: 6px 10px; border-radius: 10px; background: #f6f2e6; box-shadow: none; border: 0; }
+ul.diffs .champ { font-weight: 700; grid-column: 1 / -1; font-size: .82rem; color: var(--vert-fonce); }
+ul.diffs .avant { color: var(--terre); text-decoration: line-through; }
+ul.diffs .apres { color: var(--vert-fonce); font-weight: 800; }
+ul.diffs .fleche { color: var(--gris); }
+.supprime { color: var(--terre); }

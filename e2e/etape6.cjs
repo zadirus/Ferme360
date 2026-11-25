@@ -98,8 +98,8 @@ const iso = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.
   await P.getByText('Note à supprimer').waitFor();
   await Promise.all([poussee(), P.getByRole('button', { name: 'Supprimer' }).first().click()]);
   await aller('/journal');
-  await P.getByText('Supprimé', { exact: true }).first().waitFor({ timeout: 8000 });
-  ok(await P.getByText('Note du carnet').first().isVisible(), 'journal : la suppression de la note apparaît (qui, quand)');
+  await P.locator('ul.journal li').first().waitFor({ timeout: 8000 });
+  ok(await P.locator('ul.journal').getByText('Note du carnet').first().isVisible(), 'journal : la suppression de la note apparaît (qui, quand)');
   await P.screenshot({ path: S + '/journal.png', fullPage: true });
 
   // --- le téléphone de l'ouvrier

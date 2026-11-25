@@ -74,7 +74,7 @@ export function Stocks() {
       </div>
       {!mode && (
         <div class="actions">
-          {peut(role, 'achats') && <button class="principal" type="button" onClick={() => setMode('achat')}><span class="e">🛒</span>Nouvel achat</button>}
+          {peut(role, 'achats') && <button class="principal" type="button" onClick={() => setMode('achat')}><span class="e">📥</span>Réception de stock</button>}
           {peutEcrire(role, 'article') && <button class="principal" type="button" onClick={() => nouveau('medicament')}><span class="e">💊</span>Produit vétérinaire</button>}
           {peutEcrire(role, 'article') && <button class="principal" type="button" onClick={() => nouveau('aliment')}><span class="e">🌽</span>Aliment</button>}
           {peutEcrire(role, 'article') && <button class="secondaire" type="button" onClick={() => nouveau('autre')}>Autre article</button>}
@@ -208,7 +208,8 @@ export function AchatForm({ onFini }: { onFini: (m: string) => void }) {
 
   return (
     <form class="formulaire" onSubmit={envoyer}>
-      <h3>Nouvel achat</h3>
+      <h3>Réception de stock (livraison)</h3>
+      <p class="intro">Enregistrez ce qui vient d'être livré : la quantité entre dans le stock, et le prix et la dette éventuelle vont dans Argent.</p>
       <Choix label="Article du stock" value={articleId} onChange={setArticleId}
         options={[['', 'Autre achat (sans suivi de stock)'], ...articles.map((a) => [a.id, a.nom] as [string, string])]} />
       {!articleId && <Champ label="Ce que vous avez acheté" value={libelle} onChange={setLibelle} placeholder="Ex. : abreuvoirs, poussins" />}
@@ -223,7 +224,7 @@ export function AchatForm({ onFini }: { onFini: (m: string) => void }) {
       <Choix label="Activité concernée" value={activite} onChange={setActivite} options={ACTIVITES} />
       <Champ label="Date" type="date" max={today()} value={date} onChange={setDate} required />
       {erreur && <p class="erreur">{erreur}</p>}
-      <Boutons texte="Enregistrer l'achat" onAnnuler={() => onFini('')} />
+      <Boutons texte="Enregistrer la réception" onAnnuler={() => onFini('')} />
     </form>
   );
 }

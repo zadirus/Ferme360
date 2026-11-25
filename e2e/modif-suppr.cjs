@@ -52,7 +52,7 @@ const attendre = async (token, test, ms = 10000) => { const fin = Date.now() + m
   ok(s.find((r) => r.id === ID.c1 && !r.deleted), 'le client protégé existe toujours');
 
   await P.goto(BASE + `/#/clients/${ID.c2}`);
-  await P.getByRole('button', { name: 'Modifier', exact: true }).click();
+  await P.getByRole('button', { name: 'Modifier', exact: true }).first().click();
   await P.getByLabel('Nom', { exact: true }).fill('Boutique Moussa & fils');
   await P.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await P.getByText('Modifications enregistrées').waitFor();
@@ -65,7 +65,7 @@ const attendre = async (token, test, ms = 10000) => { const fin = Date.now() + m
 
   // ---------- article : paramètres de stock ----------
   await P.goto(BASE + `/#/stocks/${ID.a1}`);
-  await P.getByRole('button', { name: 'Modifier', exact: true }).click();
+  await P.getByRole('button', { name: 'Modifier', exact: true }).first().click();
   await P.getByText(/des mouvements existent déjà/).first().waitFor();
   ok((await P.getByText(/des mouvements existent déjà/).count()) >= 2, 'article avec mouvements : unité et catégorie verrouillées');
   await P.getByLabel('Stock minimum (alerte)').fill('5');
@@ -82,7 +82,7 @@ const attendre = async (token, test, ms = 10000) => { const fin = Date.now() + m
   await P.getByText(/Suppression impossible/).waitFor();
   ok(/mouvement\(s\) de stock/.test(await P.locator('p.erreur[role=alert]').innerText()), 'article avec stock : suppression refusée');
   // maximum inférieur au minimum refusé
-  await P.getByRole('button', { name: 'Modifier', exact: true }).click();
+  await P.getByRole('button', { name: 'Modifier', exact: true }).first().click();
   await P.getByLabel('Stock maximum (facultatif)').fill('2');
   await P.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   ok(await P.getByText(/maximum doit être supérieur/).first().isVisible(), 'maximum inférieur au minimum : refusé');
@@ -124,7 +124,7 @@ const attendre = async (token, test, ms = 10000) => { const fin = Date.now() + m
 
   // ---------- animaux ----------
   await P.goto(BASE + `/#/animaux/${ID.an1}`);
-  await P.getByRole('button', { name: 'Modifier', exact: true }).click();
+  await P.getByRole('button', { name: 'Modifier', exact: true }).first().click();
   await P.getByLabel('Numéro de boucle').fill('202');
   await P.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   ok(await P.getByText(/déjà utilisé/).first().isVisible(), 'animal : boucle déjà utilisée refusée');
@@ -134,7 +134,7 @@ const attendre = async (token, test, ms = 10000) => { const fin = Date.now() + m
   ok(/pesée/.test(await P.locator('p.erreur[role=alert]').innerText()), 'animal pesé : suppression refusée (pesée)');
 
   await P.goto(BASE + `/#/animaux/${ID.an3}`);
-  await P.getByRole('button', { name: 'Modifier', exact: true }).click();
+  await P.getByRole('button', { name: 'Modifier', exact: true }).first().click();
   await P.getByLabel('Nom (facultatif)').fill('Blanchette');
   await P.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await P.getByText('Modifications enregistrées').waitFor();
@@ -146,7 +146,7 @@ const attendre = async (token, test, ms = 10000) => { const fin = Date.now() + m
 
   // ---------- bande ----------
   await P.goto(BASE + `/#/poules/${ID.b1}`);
-  await P.getByRole('button', { name: 'Modifier', exact: true }).click();
+  await P.getByRole('button', { name: 'Modifier', exact: true }).first().click();
   await P.getByLabel('Poules à l’arrivée').fill('3');
   await P.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   ok(await P.getByText(/déjà enregistrées comme mortes/).first().isVisible(), 'bande : effectif inférieur aux mortalités déjà saisies refusé');

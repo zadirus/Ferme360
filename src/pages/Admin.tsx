@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
+import { listAll } from '../db';
+import { differences, intitule, resumeLisible, tableDesNoms } from '../journalDiff';
 import { NOM_ROLE, peut, peutToutSupprimer, ROLES_CREABLES, type Role } from '../droits';
 import { fmtDate } from '../format';
 import { useRole } from '../hooks';
@@ -215,35 +217,77 @@ function NouveauCompte({ onFini }: { onFini: (m: string) => void }) {
   );
 }
 
-interface Entree { id: number; recordId: string; collection: string; action: string; author: string; at: number; avant: Record<string, unknown> | null }
+interface Entree { id: number; recordId: string; collection: string; action: string; author: string; at: number; avant: Record<string, unknown> | null; apres: Record<string, unknown> | null }
 
+const ACTIONS: Array<[string, string]> = [['tout', 'Tout'], ['modification', 'Modifié'], ['suppression', 'Supprimé'], ['restauration', 'Restauré']];
+const NOM_ACTION: Record<string, string> = { modification: 'Modifié', suppression: 'Supprimé', restauration: 'Restauré' };
+
+// Historique des modifications : réservé au propriétaire (le serveur refuse les autres profils)
 export function Journal() {
   const [entrees, setEntrees] = useState<Entree[] | null>(null);
+  const [noms, setNoms] = useState<Map<string, string>>(new Map());
   const [erreur, setErreur] = useState('');
+  const [encore, setEncore] = useState(false);
+  const [action, setAction] = useState('tout');
+  const [type, setType] = useState('');
+  const [personne, setPersonne] = useState('');
+
+  const charger = async (avant?: number) => {
+    try {
+      const r = await api<{ entrees: Entree[] }>(`/api/journal?limite=100${avant ? `&avant=${avant}` : ''}`);
+      setEntrees((cur) => (avant ? [...(cur ?? []), ...r.entrees] : r.entrees));
+      setEncore(r.entrees.length === 100);
+      setErreur('');
+    } catch (e) {
+      setErreur(e instanceof Error && e.message !== 'Failed to fetch' ? e.message : 'Cette page demande une connexion internet.');
+    }
+  };
   useEffect(() => {
-    api<{ entrees: Entree[] }>('/api/journal?limite=100')
-      .then((r) => setEntrees(r.entrees))
-      .catch((e) => setErreur(e instanceof Error && e.message !== 'Failed to fetch' ? e.message : 'Cette page demande une connexion internet.'));
+    void charger();
+    void listAll().then((r) => setNoms(tableDesNoms(r)));
   }, []);
-  const resume = (a: Record<string, unknown> | null) =>
-    a ? Object.entries(a).filter(([k, v]) => typeof v !== 'object' && v !== '' && !k.endsWith('Id')).slice(0, 8).map(([k, v]) => `${k} : ${String(v)}`).join(' · ') : 'valeur d’avant illisible';
+
+  const toutes = entrees ?? [];
+  const types = [...new Set(toutes.map((e) => e.collection))].sort((a, b) => (LIBELLE_COLLECTION[a] ?? a).localeCompare(LIBELLE_COLLECTION[b] ?? b, 'fr'));
+  const personnes = [...new Set(toutes.map((e) => e.author))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const liste = toutes.filter((e) => (action === 'tout' || e.action === action) && (!type || e.collection === type) && (!personne || e.author === personne));
+
   return (
     <section>
       <Retour vers="/plus" texte="Plus" />
-      <h2>Journal des modifications</h2>
-      <p class="intro">Chaque modification ou suppression garde son auteur, sa date et la valeur d'avant. Conservé 24 mois.</p>
+      <h2>Historique des modifications</h2>
+      <p class="intro">Visible par le propriétaire seulement. Chaque modification, suppression ou restauration garde qui l'a faite, quand, et ce qui a changé (avant → après). Conservé 24 mois.</p>
       {erreur && <p class="erreur">{erreur}</p>}
-      <ul>
-        {(entrees ?? []).map((e) => (
-          <li key={e.id}>
-            <div class="ligne"><strong>{LIBELLE_COLLECTION[e.collection] ?? e.collection}</strong><span class={`badge ${e.action === 'suppression' ? 'rouge' : 'ambre'}`}>{e.action === 'suppression' ? 'Supprimé' : 'Modifié'}</span></div>
-            <small>par {e.author} · {dateHeure(e.at)}</small>
-            <details><summary>Valeur d'avant</summary><small>{resume(e.avant)}</small></details>
-          </li>
-        ))}
-        {entrees && entrees.length === 0 && <li class="vide">Aucune modification pour l'instant.</li>}
+      <div class="puces" role="group" aria-label="Type d’action">
+        {ACTIONS.map(([k, t]) => <button type="button" key={k} class={action === k ? 'actif' : ''} onClick={() => setAction(k)}>{t}</button>)}
+      </div>
+      <div class="filtres-journal">
+        <Choix label="Type de saisie" value={type} onChange={setType} options={[['', 'Toutes'], ...types.map((t) => [t, LIBELLE_COLLECTION[t] ?? t] as [string, string])]} />
+        <Choix label="Fait par" value={personne} onChange={setPersonne} options={[['', 'Tout le monde'], ...personnes.map((p) => [p, p] as [string, string])]} />
+      </div>
+      <ul class="journal">
+        {liste.map((e) => {
+          const diffs = e.action === 'modification' ? differences(e.avant, e.apres, noms) : [];
+          return (
+            <li key={e.id}>
+              <div class="ligne"><strong>{intitule(e.collection, e.apres ?? e.avant, noms)}</strong><span class={`badge ${e.action === 'suppression' ? 'rouge' : e.action === 'restauration' ? '' : 'ambre'}`}>{NOM_ACTION[e.action] ?? e.action}</span></div>
+              <small>par <b>{e.author}</b> · {dateHeure(e.at)}</small>
+              {e.action === 'modification' && (
+                diffs.length > 0 ? (
+                  <ul class="diffs">
+                    {diffs.map((d) => <li key={d.champ}><span class="champ">{d.champ}</span><span class="avant">{d.avant}</span><span class="fleche" aria-hidden="true">→</span><span class="apres">{d.apres}</span></li>)}
+                  </ul>
+                ) : <small>Modification sans changement visible (ancienne entrée du journal).</small>
+              )}
+              {e.action === 'suppression' && <small class="supprime">Contenu supprimé : {resumeLisible(e.avant, noms)}</small>}
+              {e.action === 'restauration' && <small>Remis en place depuis la corbeille.</small>}
+            </li>
+          );
+        })}
+        {entrees && liste.length === 0 && <li class="vide">Aucune entrée pour ces filtres.</li>}
         {entrees === null && !erreur && <li class="vide">Chargement…</li>}
       </ul>
+      {encore && <button type="button" class="secondaire" onClick={() => void charger(toutes[toutes.length - 1]?.id)}>Voir les plus anciennes</button>}
     </section>
   );
 }

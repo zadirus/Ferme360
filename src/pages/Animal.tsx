@@ -17,17 +17,20 @@ import { gestationParDefaut } from '../reglages';
 import { newId, saveRecord } from '../sync';
 import { EtiquettesFiche } from '../etiquettes';
 import { ActionsFiche } from '../ActionsFiche';
+import { ModifierSaisie, specModification } from '../ModifierSaisie';
 import { nomDejaPris } from '../integrite';
 import { Alertes, Boutons, Champ, Choix, nombre, Retour, Stat } from '../ui';
 
 type Action = 'pesee' | 'soin' | 'repro' | 'misebas' | 'lot' | 'sortie' | 'traite' | 'travail';
 
-interface Evt { cle: string; date: string; maj: number; aut?: string; texte: string; supprimer?: () => Promise<void> }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface Evt { cle: string; item?: Item<any>; col?: string; date: string; maj: number; aut?: string; texte: string; supprimer?: () => Promise<void> }
 
 export function AnimalDetail({ id }: { id: string }) {
   const r = useRuminants();
   const [action, setAction] = useState<Action | null>(null);
   const [message, setMessage] = useState('');
+  const [modif, setModif] = useState<string | null>(null);
   const articlesT = useItems<Article>('article');
   const stockMvtsT = useItems<StockMvt>('stock_mvt');
   const ventesT = useItems<Vente>('vente');
@@ -59,8 +62,8 @@ export function AnimalDetail({ id }: { id: string }) {
   };
 
   const evts: Evt[] = [
-    ...r.pesees.filter((p) => p.animalId === id).map((p) => ({ cle: 'p' + p.id, date: p.date, maj: p.updatedAt, aut: p.author, texte: `Pesée : ${fmtDec(p.poids, 1)} kg (${p.methode === 'balance' ? 'balance' : 'ruban'})`, supprimer: () => effacer('pesee', p, 'Supprimer cette pesée ?') })),
-    ...r.soins.filter((s) => s.animalId === id).map((s) => ({ cle: 's' + s.id, date: s.date, maj: s.updatedAt, aut: s.author, texte: `${NOM_SOIN[s.type]} : ${s.produit}${s.delaiAttente ? ` · délai d'attente ${s.delaiAttente} j` : ''}${s.cout ? ` · ${fmtFcfa(s.cout)}` : ''}`,
+    ...r.pesees.filter((p) => p.animalId === id).map((p) => ({ cle: 'p' + p.id, item: p, col: 'pesee', date: p.date, maj: p.updatedAt, aut: p.author, texte: `Pesée : ${fmtDec(p.poids, 1)} kg (${p.methode === 'balance' ? 'balance' : 'ruban'})`, supprimer: () => effacer('pesee', p, 'Supprimer cette pesée ?') })),
+    ...r.soins.filter((s) => s.animalId === id).map((s) => ({ cle: 's' + s.id, item: s, col: 'soin', date: s.date, maj: s.updatedAt, aut: s.author, texte: `${NOM_SOIN[s.type]} : ${s.produit}${s.delaiAttente ? ` · délai d'attente ${s.delaiAttente} j` : ''}${s.cout ? ` · ${fmtFcfa(s.cout)}` : ''}`,
       supprimer: () => effacer('soin', s, 'Supprimer ce soin, sa dépense et la sortie de stock liée ?', async () => { for (const d of r.depenses.filter((x) => x.soinId === s.id)) await saveRecord('depense', d.id, dataOf(d), true); for (const m of stockMvtsT.filter((x) => x.alimentId === s.id)) await saveRecord('stock_mvt', m.id, dataOf(m), true); }) })),
     ...r.repro.filter((x) => x.femelleId === id).map((x) => ({ cle: 'r' + x.id, date: x.date, maj: x.updatedAt, aut: x.author,
       texte: x.type === 'chaleurs' ? 'Chaleurs' : x.type === 'saillie' ? `Saillie${x.maleId ? ` par ${nom(x.maleId)}` : ''}` : `Diagnostic de gestation : ${x.resultat === 'gestante' ? 'gestante' : 'vide'}`,
@@ -73,7 +76,7 @@ export function AnimalDetail({ id }: { id: string }) {
           for (const v of r.pesees.filter((x) => x.animalId === p.id)) await saveRecord('pesee', v.id, dataOf(v), true);
         }
       }) })),
-    ...r.traites.filter((t) => t.animalId === id).map((t) => ({ cle: 't' + t.id, date: t.date, maj: t.updatedAt, aut: t.author, texte: `Traite : ${fmtDec(t.litres, 1)} L`, supprimer: () => effacer('traite', t, 'Supprimer cette traite ?') })),
+    ...r.traites.filter((t) => t.animalId === id).map((t) => ({ cle: 't' + t.id, item: t, col: 'traite', date: t.date, maj: t.updatedAt, aut: t.author, texte: `Traite : ${fmtDec(t.litres, 1)} L`, supprimer: () => effacer('traite', t, 'Supprimer cette traite ?') })),
     ...r.travaux.filter((t) => t.animalId === id).map((t) => ({ cle: 'w' + t.id, date: t.date, maj: t.updatedAt, aut: t.author, texte: `Travail : ${fmtDec(t.jours, 1)} j${t.recette ? ` · recette ${fmtFcfa(t.recette)}` : ''}`, supprimer: async () => { if (!window.confirm('Supprimer ce travail (et la recette liée) ?')) return; await supprimerTravail(t, ventesT, paiementsT); setMessage('Saisie supprimée'); } })),
     ...r.mvts.filter((m) => m.animalId === id).map((m) => ({ cle: 'm' + m.id, date: m.date, maj: m.updatedAt, aut: m.author,
       texte: m.type === 'entree' ? (m.motif === 'achat' ? 'Entrée : achat' : 'Entrée : naissance') : m.type === 'lot' ? `Changement de lot${m.lotId ? ` : ${r.lots.find((l) => l.id === m.lotId)?.nom ?? ''}` : ' : aucun lot'}` : `Sortie : ${m.motif}`,
@@ -167,7 +170,9 @@ export function AnimalDetail({ id }: { id: string }) {
         {evts.map((e) => (
           <li key={e.cle}>
             <div class="ligne"><span>{e.texte}</span><small>{fmtDate(e.date)}</small></div>
+            {e.item && e.col && ecrit(e.col) && specModification(e.col) && <button type="button" class="lien vert" onClick={() => setModif(modif === e.cle ? null : e.cle)}>Modifier</button>}
             {e.supprimer && peutSupprimerSaisie(role, e.maj, e.aut, getUser()?.name) && ecrit({ p: 'pesee', s: 'soin', r: 'repro', b: 'misebas', m: 'mvt_animal', t: 'traite', w: 'travail' }[e.cle[0]] ?? '') && <button type="button" class="lien" onClick={() => void e.supprimer!()}>Supprimer</button>}
+            {modif === e.cle && e.item && e.col && <ModifierSaisie collection={e.col} item={e.item} onFini={(m) => { setModif(null); if (m) setMessage(m); }} />}
           </li>
         ))}
         {evts.length === 0 && <li class="vide">Aucune saisie.</li>}

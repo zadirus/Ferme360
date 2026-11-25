@@ -76,6 +76,11 @@ function ensureSchema(db: D1Database): Promise<void> {
       if (!cols.results.some((c) => c.name === 'active')) {
         await db.prepare(`ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1`).run();
       }
+      // journal : on garde aussi la valeur d'après, pour afficher clairement « avant → après »
+      const colsJ = await db.prepare(`PRAGMA table_info(journal)`).all<{ name: string }>();
+      if (!colsJ.results.some((c) => c.name === 'after')) {
+        await db.prepare(`ALTER TABLE journal ADD COLUMN after TEXT NOT NULL DEFAULT ''`).run();
+      }
       await db
         .prepare(`INSERT OR IGNORE INTO settings(key, value) VALUES ('token_secret', ?)`)
         .bind(randomHex(32))
@@ -340,10 +345,10 @@ async function sync(req: Request, env: Env, session: Session): Promise<Response>
       if (data.length > MAX_DATA_BYTES) return fail(413, 'Enregistrement trop volumineux.');
       const ancien = avant.get(c.id);
       if (ancien && c.updatedAt >= ancien.updated_at && (ancien.data !== data || (ancien.deleted === 1) !== c.deleted)) {
-        const action = c.deleted && ancien.deleted !== 1 ? 'suppression' : 'modification';
+        const action = c.deleted && ancien.deleted !== 1 ? 'suppression' : !c.deleted && ancien.deleted === 1 ? 'restauration' : 'modification';
         stmts.push(
-          env.DB.prepare(`INSERT INTO journal(record_id,collection,action,author,at,before) VALUES (?,?,?,?,?,?)`).bind(
-            c.id, c.collection, action, session.name, maintenant, ancien.data.slice(0, 4000)
+          env.DB.prepare(`INSERT INTO journal(record_id,collection,action,author,at,before,after) VALUES (?,?,?,?,?,?,?)`).bind(
+            c.id, c.collection, action, session.name, maintenant, ancien.data.slice(0, 4000), data.slice(0, 4000)
           )
         );
       }
@@ -475,14 +480,17 @@ async function changerMotDePasse(req: Request, env: Env, session: Session): Prom
 
 async function journal(url: URL, env: Env): Promise<Response> {
   const limite = Math.min(200, Math.max(1, Number(url.searchParams.get('limite')) || 100));
-  const r = await env.DB.prepare(`SELECT id,record_id,collection,action,author,at,before FROM journal ORDER BY id DESC LIMIT ?`)
-    .bind(limite)
-    .all<{ id: number; record_id: string; collection: string; action: string; author: string; at: number; before: string }>();
+  const avantId = Number(url.searchParams.get('avant')) || Number.MAX_SAFE_INTEGER;
+  const r = await env.DB.prepare(`SELECT id,record_id,collection,action,author,at,before,after FROM journal WHERE id < ? ORDER BY id DESC LIMIT ?`)
+    .bind(avantId, limite)
+    .all<{ id: number; record_id: string; collection: string; action: string; author: string; at: number; before: string; after: string }>();
   return json({
     entrees: r.results.map((e) => {
       let avant: unknown = null;
+      let apres: unknown = null;
       try { avant = JSON.parse(e.before); } catch { avant = null; }
-      return { id: e.id, recordId: e.record_id, collection: e.collection, action: e.action, author: e.author, at: e.at, avant };
+      try { apres = e.after ? JSON.parse(e.after) : null; } catch { apres = null; }
+      return { id: e.id, recordId: e.record_id, collection: e.collection, action: e.action, author: e.author, at: e.at, avant, apres };
     })
   });
 }

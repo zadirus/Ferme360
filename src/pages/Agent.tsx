@@ -1,7 +1,8 @@
 // Interface simplifiée de l'agent d'élevage : gros boutons, une saisie = un écran, aucun menu à chercher.
 import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
-import { peutSupprimerSaisie } from '../droits';
+import { peutEcrire, peutSupprimerSaisie, peutToutSupprimer } from '../droits';
+import { ModifierSaisie, specModification } from '../ModifierSaisie';
 import { dataOf, go, useItems, useRole, type Item } from '../hooks';
 import { fmtDate, fmtInt, fmtQte, OEUFS_PAR_PLATEAU, today } from '../format';
 import { coutMoyen } from '../gestion/calculs';
@@ -145,6 +146,8 @@ function ListeSaisies({ types, pas = 25 }: { types: Type[]; pas?: number }) {
   const role = useRole();
   const moi = getUser()?.name;
   const [nb, setNb] = useState(pas);
+  const [modif, setModif] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
   const toutes = useSaisies().filter((l) => types.includes(l.type));
   const lignes = toutes.slice(0, nb);
   const hier = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
@@ -152,6 +155,7 @@ function ListeSaisies({ types, pas = 25 }: { types: Type[]; pas?: number }) {
   const jours = [...new Set(lignes.map((l) => l.date))];
   return (
     <>
+      {message && <p class="succes" role="status">{message}</p>}
       {jours.map((j) => (
         <div key={j}>
           <h3 class="jour">{titreJour(j)}</h3>
@@ -162,9 +166,13 @@ function ListeSaisies({ types, pas = 25 }: { types: Type[]; pas?: number }) {
                   <span>{l.texte}</span>
                   {l.auteur && <small>{l.auteur.split(' ')[0]}</small>}
                 </div>
+                {specModification(l.collection) && peutEcrire(role, l.collection) && (peutToutSupprimer(role) || l.auteur === moi) && (
+                  <button type="button" class="lien vert" onClick={() => setModif(modif === l.cle ? null : l.cle)}>Modifier</button>
+                )}
                 {peutSupprimerSaisie(role, l.maj, l.auteur, moi) && (
                   <button type="button" class="lien" onClick={async () => { if (window.confirm('Annuler cette saisie ?')) await saveRecord(l.collection, l.cle, dataOf(l.item), true); }}>Annuler</button>
                 )}
+                {modif === l.cle && <ModifierSaisie collection={l.collection} item={l.item} simple onFini={(m) => { setModif(null); if (m) setMessage(m); }} />}
               </li>
             ))}
           </ul>

@@ -1,6 +1,7 @@
 import { getUser } from '../session';
 import { useState } from 'preact/hooks';
 import { EtiquettesFiche } from '../etiquettes';
+import { ModifierSaisie, specModification } from '../ModifierSaisie';
 import { ActionsFiche } from '../ActionsFiche';
 import { nomDejaPris } from '../integrite';
 import { dataOf, useItems, useRole, type Item } from '../hooks';
@@ -28,6 +29,8 @@ interface Evenement {
   texte: string;
   updatedAt: number;
   auteur?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  item: Item<any>;
   supprimer: () => Promise<void>;
 }
 
@@ -51,6 +54,7 @@ export function BandeDetail({ id }: { id: string }) {
   const ecrit = (c: string) => peutEcrire(role, c);
   const [action, setAction] = useState<Action | null>(null);
   const [message, setMessage] = useState('');
+  const [modif, setModif] = useState<string | null>(null);
 
   const b = bandes.find((x) => x.id === id);
   if (!b) {
@@ -82,17 +86,17 @@ export function BandeDetail({ id }: { id: string }) {
 
   const evenements: Evenement[] = [
     ...ram.map((r) => ({
-      id: r.id, collection: 'ramassage', date: r.date, updatedAt: r.updatedAt, auteur: r.author,
+      id: r.id, item: r, collection: 'ramassage', date: r.date, updatedAt: r.updatedAt, auteur: r.author,
       texte: `Ramassage : ${fmtInt(r.bons)} bons, ${fmtInt(r.feles)} fêlés, ${fmtInt(r.casses)} cassés`,
       supprimer: suppr('ramassage', r)
     })),
     ...morts.map((m) => ({
-      id: m.id, collection: 'mortalite', date: m.date, updatedAt: m.updatedAt, auteur: m.author,
+      id: m.id, item: m, collection: 'mortalite', date: m.date, updatedAt: m.updatedAt, auteur: m.author,
       texte: `${m.type === 'mort' ? 'Mortalité' : 'Réforme'} : ${fmtInt(m.nombre)}${m.cause ? ` (${m.cause})` : ''}`,
       supprimer: suppr('mortalite', m)
     })),
     ...aliments.map((a) => ({
-      id: a.id, collection: 'aliment', date: a.date, updatedAt: a.updatedAt, auteur: a.author,
+      id: a.id, item: a, collection: 'aliment', date: a.date, updatedAt: a.updatedAt, auteur: a.author,
       texte: `Aliment ${a.type} : ${fmtDec(a.kg)} kg${argent && coutDistribution(a, articlesTous, achatsTous) ? ` · ${fmtFcfa(coutDistribution(a, articlesTous, achatsTous))}` : ''}`,
       supprimer: async () => {
         if (!window.confirm('Supprimer cette saisie ? Le stock d’aliment sera rétabli.')) return;
@@ -102,7 +106,7 @@ export function BandeDetail({ id }: { id: string }) {
       }
     })),
     ...santes.map((s) => ({
-      id: s.id, collection: 'sante', date: s.date, updatedAt: s.updatedAt, auteur: s.author,
+      id: s.id, item: s, collection: 'sante', date: s.date, updatedAt: s.updatedAt, auteur: s.author,
       texte: `${s.type === 'vaccin' ? 'Vaccin' : s.type === 'traitement' ? 'Traitement' : 'Santé'} : ${s.produit}${s.rappel ? ` · rappel le ${fmtDate(s.rappel)}` : ''}`,
       supprimer: async () => {
         if (!window.confirm('Supprimer cette saisie ? La sortie de stock liée sera annulée.')) return;
@@ -111,8 +115,8 @@ export function BandeDetail({ id }: { id: string }) {
         setMessage('Saisie supprimée');
       }
     })),
-    ...eaux.map((e) => ({ id: e.id, collection: 'eau', date: e.date, updatedAt: e.updatedAt, auteur: e.author, texte: `Eau : ${fmtDec(e.litres, 0)} litres`, supprimer: suppr('eau', e) })),
-    ...fientes.map((f) => ({ id: f.id, collection: 'fientes', date: f.date, updatedAt: f.updatedAt, auteur: f.author, texte: `Fientes : ${fmtDec(f.sacs, 0)} sac(s)`, supprimer: suppr('fientes', f) }))
+    ...eaux.map((e) => ({ id: e.id, item: e, collection: 'eau', date: e.date, updatedAt: e.updatedAt, auteur: e.author, texte: `Eau : ${fmtDec(e.litres, 0)} litres`, supprimer: suppr('eau', e) })),
+    ...fientes.map((f) => ({ id: f.id, item: f, collection: 'fientes', date: f.date, updatedAt: f.updatedAt, auteur: f.author, texte: `Fientes : ${fmtDec(f.sacs, 0)} sac(s)`, supprimer: suppr('fientes', f) }))
   ]
     .sort((x, y) => y.date.localeCompare(x.date) || y.updatedAt - x.updatedAt)
     .slice(0, 40);
@@ -211,9 +215,13 @@ export function BandeDetail({ id }: { id: string }) {
           <li key={ev.collection + ev.id}>
             <span>{ev.texte}</span>
             <small>{fmtDate(ev.date)}</small>
+            {!b.cloturee && ecrit(ev.collection) && specModification(ev.collection) && (
+              <button type="button" class="lien vert" onClick={() => setModif(modif === ev.id ? null : ev.id)}>Modifier</button>
+            )}
             {!b.cloturee && ecrit(ev.collection) && peutSupprimerSaisie(role, ev.updatedAt, ev.auteur, getUser()?.name) && (
               <button type="button" class="lien" onClick={() => void ev.supprimer()}>Supprimer</button>
             )}
+            {modif === ev.id && <ModifierSaisie collection={ev.collection} item={ev.item} onFini={(m) => { setModif(null); if (m) setMessage(m); }} />}
           </li>
         ))}
         {evenements.length === 0 && <li class="vide">Aucune saisie pour cette bande.</li>}

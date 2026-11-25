@@ -57,14 +57,14 @@ const futur = (j) => { const d = new Date(); d.setDate(d.getDate() + j); return 
   await envoyer("Créer l'article");
   await P.getByText('Article créé').waitFor();
 
-  await P.getByRole('button', { name: /Nouvel achat/ }).click();
+  await P.getByRole('button', { name: /Réception de stock/ }).click();
   await P.getByLabel('Article du stock').selectOption({ label: 'Aliment ponte' });
   await P.getByLabel('Quantité achetée').fill('20');
   await P.getByLabel('Prix total').fill('340000');
-  await envoyer("Enregistrer l'achat");
+  await envoyer("Enregistrer la réception");
   await P.getByText(/Achat enregistré/).waitFor();
 
-  await P.getByRole('button', { name: /Nouvel achat/ }).click();
+  await P.getByRole('button', { name: /Réception de stock/ }).click();
   await P.getByLabel('Article du stock').selectOption({ label: 'Vaccin Newcastle' });
   await P.getByLabel('Quantité achetée').fill('10');
   await P.getByLabel('Date de péremption').fill(futur(25));
@@ -72,7 +72,7 @@ const futur = (j) => { const d = new Date(); d.setDate(d.getDate() + j); return 
   await P.getByLabel('Payé maintenant').fill('0');
   await P.getByLabel('Fournisseur').selectOption('__nouveau');
   await P.getByLabel('Nom du fournisseur').fill('AgriPlus');
-  await envoyer("Enregistrer l'achat");
+  await envoyer("Enregistrer la réception");
   await P.getByText(/Achat enregistré/).waitFor();
   await P.getByText(/Vaccin Newcastle : périme dans 25 jour/).first().waitFor({ timeout: 5000 });
   ok(true, 'vaccin qui périme dans 25 jours : alerte affichée');
