@@ -44,7 +44,7 @@ export function Aide() {
           <p>Rien n'est perdu : installez l'application sur le nouveau téléphone, connectez-vous avec votre nom et votre mot de passe, et vos données reviennent. Si le téléphone perdu était celui d'un employé, désactivez son compte dans <b>Plus, Équipe</b> (propriétaire).</p>
         </Bloc>
         <Bloc titre="Qui voit quoi">
-          <p><b>Propriétaire</b> : tout et la gestion des comptes. <b>Gérant</b> : tout sauf les comptes. <b>Ouvrier</b> : élevage et stocks, jamais d'argent. <b>Vétérinaire</b> : soins et santé, jamais d'argent. Les données interdites ne sont même pas envoyées sur leur téléphone.</p>
+          <p><b>Propriétaire</b> : tout et la gestion des comptes. <b>Gérant</b> : tout sauf les comptes. <b>Agent d’élevage</b> : élevage et stocks, jamais d'argent. <b>Vétérinaire</b> : soins et santé, jamais d'argent. Les données interdites ne sont même pas envoyées sur leur téléphone.</p>
         </Bloc>
         <Bloc titre="Les notifications n'arrivent pas">
           <p>Voir <b>Plus, Notifications</b> : ajoutez l'application à l'écran d'accueil de Chrome, autorisez les notifications, et retirez l'économie de batterie pour Chrome (surtout sur Xiaomi, Tecno, Infinix, Samsung). « Envoyer un test » permet de vérifier tout de suite.</p>

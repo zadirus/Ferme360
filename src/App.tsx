@@ -7,6 +7,7 @@ import { peut, peutToutSupprimer } from './droits';
 import { appliquerReglages, ID_REGLAGES, type Reglages as TypeReglages } from './reglages';
 import { Equipe, Journal, MotDePasse, Plus } from './pages/Admin';
 import { Corbeille } from './pages/Corbeille';
+import { AccueilAgent, SaisieAliment, SaisieDeces, SaisieOeufs, SaisiePesee } from './pages/Agent';
 import { Rapports } from './pages/Rapports';
 import { Notifications } from './pages/Notifications';
 import { Aide } from './pages/Aide';
@@ -78,6 +79,8 @@ function autorise(route: string, role: string): boolean {
   if (route === '/sauvegarde' || route === '/import') return peut(role, 'sauvegarde');
   if (route === '/equipe') return peut(role, 'equipe');
   if (route === '/journal') return peut(role, 'journal');
+  if (route === '/tableau') return role !== 'ouvrier';
+  if (route.startsWith('/saisie/')) return role === 'ouvrier';
   if (route === '/corbeille') return peutToutSupprimer(role);
   return true;
 }
@@ -157,7 +160,11 @@ export function App() {
   else if (route === '/tableau') page = <Tableau />;
   else if (route === '/import') page = <Import />;
   else if (route === '/pin') page = <Pin />;
-  else page = <Accueil />;
+  else if (route === '/saisie/oeufs') page = <SaisieOeufs />;
+  else if (route === '/saisie/deces') page = <SaisieDeces />;
+  else if (route === '/saisie/aliment') page = <SaisieAliment />;
+  else if (route === '/saisie/pesee') page = <SaisiePesee />;
+  else page = role === 'ouvrier' ? <AccueilAgent /> : <Accueil />;
 
   const actif = (p: string) => (p === '/' ? route === '/' : (FAMILLES[p] ?? [p]).some((x) => route.startsWith(x)));
   const actifBureau = (p: string) => (p === '/' ? route === '/' : (FAMILLES[p] ?? [p]).some((x) => route.startsWith(x)));

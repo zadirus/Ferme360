@@ -227,3 +227,47 @@ button.etiquette.propose.actif { background: var(--vert); color: #fff; border-st
 .actions-fiche .ligne-actions { display: flex; gap: 18px; }
 .actions-fiche .lien.danger-lien { color: #a3281a; }
 .actions-fiche.compact { margin: 2px 0; }
+
+/* Interface simplifiée de l'agent d'élevage */
+.gros-boutons { list-style: none; padding: 0; margin: 12px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.gros-boutons li { padding: 0; background: none; box-shadow: none; border: 0; display: block; }
+.gros-bouton { display: grid; place-items: center; gap: 6px; text-align: center; min-height: 118px; padding: 14px 10px; border-radius: 20px; background: var(--carte); color: var(--texte); text-decoration: none; font-weight: 800; font-size: 1.02rem; box-shadow: var(--ombre); border: 2px solid transparent; }
+.gros-bouton .ico { font-size: 2.2rem; line-height: 1; }
+.gros-bouton.oeuf { background: var(--ambre-clair); border-color: #efd48a; }
+.gros-bouton.deces { background: var(--terre-clair); border-color: #efc5a8; }
+.gros-bouton.aliment { background: var(--vert-clair); border-color: #bcd6b6; }
+.gros-bouton.pesee { background: var(--bleu-clair); border-color: #bcd3ea; }
+.gros-bouton.note { background: var(--rose-clair); border-color: #e9c1cb; }
+.resume-jour { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0 6px; }
+.resume-jour div { background: var(--carte); border-radius: 16px; padding: 12px 14px; box-shadow: var(--ombre); }
+.resume-jour strong { display: block; font-size: 1.6rem; color: var(--vert-fonce); }
+.resume-jour span { color: var(--gris); font-size: .86rem; }
+.saisies-jour { list-style: none; padding: 0; display: grid; gap: 8px; }
+.saisies-jour li { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.petit-texte { font-size: .86rem; }
+.titre-saisie { font-size: 1.5rem; margin: 6px 0 14px; }
+.compteur { display: grid; gap: 6px; margin: 12px 0; }
+.compteur .libelle, .choix-gros .libelle { font-weight: 700; color: var(--vert-fonce); }
+.compteur-ligne { display: grid; grid-template-columns: 64px 1fr 64px; gap: 10px; align-items: stretch; }
+.compteur-ligne button { min-height: 64px; border-radius: 16px; font-size: 2rem; font-weight: 800; border: 0; color: #fff; }
+.compteur-ligne .moins { background: var(--terre); }
+.compteur-ligne .plus { background: var(--vert); }
+.champ-gros { display: flex; align-items: center; justify-content: center; background: var(--carte); border: 2px solid var(--trait); border-radius: 16px; min-height: 64px; padding: 0 10px; }
+.champ-gros input { border: 0; background: none; text-align: center; font-size: 2rem; font-weight: 800; width: 100%; min-width: 0; min-height: 0; padding: 0; box-shadow: none; }
+.champ-gros em { color: var(--gris); font-style: normal; font-weight: 700; }
+.total-saisie { text-align: center; font-size: 1.2rem; margin: 10px 0; }
+.choix-gros { display: grid; gap: 6px; margin: 12px 0; }
+.choix-ligne { display: flex; flex-wrap: wrap; gap: 8px; }
+.choix-ligne button { min-height: 52px; padding: 8px 16px; border-radius: 14px; border: 2px solid var(--trait); background: var(--carte); font-weight: 700; font-size: 1rem; width: auto; }
+.choix-ligne button.actif { background: var(--vert); border-color: var(--vert); color: #fff; }
+.rapides { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 8px; }
+.rapides button { min-height: 48px; padding: 6px 16px; border-radius: 999px; border: 2px solid var(--trait); background: var(--carte); font-weight: 700; width: auto; }
+button.gros, button.principal.gros { min-height: 62px; font-size: 1.15rem; border-radius: 18px; width: 100%; margin-top: 8px; }
+.fait { text-align: center; padding: 20px 6px; }
+.fait .coche { width: 84px; height: 84px; margin: 0 auto 10px; border-radius: 50%; background: var(--vert); color: #fff; display: grid; place-items: center; font-size: 3rem; font-weight: 800; }
+.recherche-gros { width: 100%; min-height: 56px; font-size: 1.1rem; }
+.liste-animaux { list-style: none; padding: 0; display: grid; gap: 8px; margin: 10px 0; }
+.liste-animaux li { padding: 0; background: none; box-shadow: none; border: 0; }
+.liste-animaux button { display: grid; text-align: left; width: 100%; min-height: 60px; padding: 10px 14px; border-radius: 16px; border: 2px solid var(--trait); background: var(--carte); font-size: 1.05rem; gap: 2px; }
+.liste-animaux button span { color: var(--gris); font-size: .86rem; }
+.animal-choisi { font-size: 1.3rem; margin: 6px 0; }

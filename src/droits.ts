@@ -5,7 +5,7 @@ export type Role = 'owner' | 'gerant' | 'ouvrier' | 'veterinaire';
 export const NOM_ROLE: Record<Role, string> = {
   owner: 'Propriétaire',
   gerant: 'Gérant',
-  ouvrier: 'Ouvrier (élevage)',
+  ouvrier: 'Agent d’élevage',
   veterinaire: 'Vétérinaire'
 };
 

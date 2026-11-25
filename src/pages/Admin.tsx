@@ -25,7 +25,7 @@ export function Plus() {
       <h2>Plus</h2>
       <p class="intro">{user?.name} · {NOM_ROLE[role as Role] ?? role}</p>
       <ul>
-        {lien('/tableau', '📊', 'Tableau de bord', 'Chiffres clés et graphiques de toute la ferme')}
+        {role !== 'ouvrier' && lien('/tableau', '📊', 'Tableau de bord', 'Chiffres clés et graphiques de toute la ferme')}
         {peut(role, 'argent') && lien('/argent', '💰', 'Argent', 'Caisse, Mobile Money, dettes, dépenses, résultats')}
         {peut(role, 'rapports') && lien('/rapports', '📄', 'Rapports', 'Mois par mois, en PDF ou Excel, à partager')}
         {lien('/carnet', '📒', 'Carnet', 'Vos notes')}
