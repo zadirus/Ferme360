@@ -18,6 +18,7 @@ const attendre = async (token, test, ms = 10000) => { const fin = Date.now() + m
   await call('/api/users', { name: 'Docteur Kone', password: 'veto-12345', role: 'veterinaire' }, owner);
   await call('/api/sync', { since: 0, epoch: '', changes: [
     rec('bande', 'bande-agent-0001', { nom: 'Bande 1', effectifInitial: 400, dateArrivee: jour(100), ageArriveeSemaines: 18, batiment: '', souche: '', origine: '', prixAchat: 0 }),
+    rec('bande', 'bande-agent-0000', { nom: 'Ancienne bande', effectifInitial: 300, dateArrivee: jour(250), ageArriveeSemaines: 18, batiment: '', souche: '', origine: '', prixAchat: 0 }),
     rec('article', 'article-aliment-001', { nom: 'Aliment ponte', unite: 'sac', categorie: 'aliment', seuil: 0, kgParUnite: 50 }),
     rec('stock_mvt', 'mvt-aliment-000001', { articleId: 'article-aliment-001', date: jour(10), type: 'entree', quantite: 20, peremption: '', achatId: '', alimentId: '', note: '' }),
     rec('article', 'article-vaccin-0001', { nom: 'Vaccin Newcastle', unite: 'dose', categorie: 'medicament', seuil: 0, kgParUnite: 1 }),
@@ -49,6 +50,7 @@ const attendre = async (token, test, ms = 10000) => { const fin = Date.now() + m
 
   // ramassage rétrosaisie
   await A.goto(BASE + '/#/saisie/oeufs');
+  ok(await A.getByRole('button', { name: 'Bande 1 · en cours' }).getAttribute('aria-pressed') === 'true', 'plusieurs bandes : la bande en cours est choisie d’office');
   await A.locator('input[type=date]').fill(jour(2));
   await A.getByRole('spinbutton', { name: 'Plateaux complets de bons œufs' }).fill('10');
   await A.getByRole('spinbutton', { name: /Bons œufs en plus/ }).fill('21');
@@ -61,6 +63,7 @@ const attendre = async (token, test, ms = 10000) => { const fin = Date.now() + m
   const ram = s.find((r) => r.collection === 'ramassage');
   ok(ram && ram.data.date === jour(2) && ram.data.bons === 321 && ram.data.casses === 3, 'ramassage : 321 bons œufs (10 plateaux de 30 + 21) et 3 cassés, à la date choisie');
 
+  ok(ram.data.bandeId === 'bande-agent-0001', 'ramassage enregistré sur la bande en cours, sans la choisir');
   // « Faire une autre saisie » repart d'un formulaire vide
   await clic(A, 'Faire une autre saisie').click();
   ok((await A.getByRole('spinbutton', { name: 'Plateaux complets de bons œufs' }).inputValue()) === '', 'après un enregistrement, « Faire une autre saisie » ouvre un formulaire vide');

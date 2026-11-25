@@ -93,9 +93,11 @@ function useBande() {
   const bandes = useItems<Bande>('bande').filter((b) => !b.cloturee);
   const morts = useItems<Mortalite>('mortalite');
   const [choix, setChoix] = useState('');
-  const bande = bandes.length === 1 ? bandes[0] : bandes.find((b) => b.id === choix);
+  // la bande en cours (la plus récente, non clôturée) est choisie d'office ; on peut en changer d'un toucher
+  const parDefaut = [...bandes].sort((a, b) => b.dateArrivee.localeCompare(a.dateArrivee))[0];
+  const bande = bandes.find((b) => b.id === choix) ?? parDefaut;
   const selecteur = bandes.length > 1 ? (
-    <Pastilles label="Quelle bande ?" valeur={choix} options={bandes.map((b) => [b.id, b.nom] as [string, string])} onChange={setChoix} />
+    <Pastilles label="Bande (en cours par défaut)" valeur={bande?.id ?? ''} options={bandes.map((b) => [b.id, b.id === parDefaut?.id ? `${b.nom} · en cours` : b.nom] as [string, string])} onChange={setChoix} />
   ) : null;
   return { bandes, bande, selecteur, effectif: bande ? effectifActuel(bande, morts.filter((m) => m.bandeId === bande.id)) : 0 };
 }
@@ -463,7 +465,8 @@ function SaisieSoinEcran({ relancer }: { relancer: () => void }) {
   const [erreur, setErreur] = useState('');
   if (fait) return <Fait titre="Soin enregistré" detail={fait} onEncore={relancer} />;
 
-  const bande = bandes.length === 1 ? bandes[0] : bandes.find((b) => b.id === bandeId);
+  const parDefaut = [...bandes].sort((a, b) => b.dateArrivee.localeCompare(a.dateArrivee))[0];
+  const bande = bandes.find((b) => b.id === bandeId) ?? parDefaut;
   const presents = r.animaux.filter((a) => r.statut(a.id) === 'present').sort((a, b) => a.boucle.localeCompare(b.boucle, 'fr', { numeric: true }));
   const q = recherche.trim().toLowerCase();
   const trouves = presents.filter((a) => !q || `${a.boucle} ${a.nom}`.toLowerCase().includes(q)).slice(0, 8);
@@ -502,7 +505,7 @@ function SaisieSoinEcran({ relancer }: { relancer: () => void }) {
       <form class="formulaire" onSubmit={envoyer}>
         <ChampDate valeur={date} onChange={setDate} />
         <Pastilles label="Qui est soigné ?" valeur={cible} options={[['poules', '🐔 Poules'], ['animal', '🐑 Un animal'], ['lot', 'Un lot']]} onChange={setCible} />
-        {cible === 'poules' && (bandes.length === 0 ? <AucuneBande /> : bandes.length > 1 && <Pastilles label="Quelle bande ?" valeur={bandeId} options={bandes.map((b) => [b.id, b.nom] as [string, string])} onChange={setBandeId} />)}
+        {cible === 'poules' && (bandes.length === 0 ? <AucuneBande /> : bandes.length > 1 && <Pastilles label="Bande (en cours par défaut)" valeur={bande?.id ?? ''} options={bandes.map((b) => [b.id, b.id === parDefaut?.id ? `${b.nom} · en cours` : b.nom] as [string, string])} onChange={setBandeId} />)}
         {cible === 'animal' && (!animal ? (
           <>
             <input type="search" class="recherche-gros" placeholder="Numéro de boucle ou nom" value={recherche} onInput={(e) => setRecherche(e.currentTarget.value)} />

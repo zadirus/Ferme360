@@ -125,3 +125,7 @@ Avant de livrer : `npm run build` doit passer.
 - Aliment : compté en sacs par défaut (1, 1,5, 2, 5 ; poids du sac = `kgParUnite` de l'article, 50 kg à défaut) ou en kg ; `Aliment.sacs` mémorise la saisie ; le stock est débité en unités du stock.
 - Médicament : `SaisieSoin` crée une `sante` (poules, par bande) ou un `soin` (animal ou lot, délai d'attente, rappel, nom du vétérinaire si profil vétérinaire, coût toujours 0) et la sortie de stock liée (`alimentId` = id du soin). Droits : l'ouvrier peut écrire `soin` et `sante` ; la capacité `stocks` est ouverte à tous les profils (le vétérinaire consulte son stock, sans prix). Le vétérinaire n'accède qu'à `/saisie/soin`, `/saisie/pesee` et leurs listes.
 - Test : `e2e/agent.cjs`.
+
+## Ramassage en plateaux et bande par défaut (étape 7, lot 12)
+- Ramassage de l'agent : trois compteurs, comme sur le terrain — plateaux complets de bons œufs, bons œufs en plus (< 30, le trop-plein devient un plateau), œufs cassés. Stocké comme avant : `bons` = plateaux × 30 + œufs en plus, `feles` = 0 (le champ reste pour l'historique et les écrans du gérant), `casses`. Affichage « 11 plateaux et 8 œufs » (`libelleBons`).
+- Bande par défaut : la bande en cours (non clôturée, arrivée la plus récente) est choisie d'office pour les œufs, décès, aliment et soins des poules ; s'il y en a plusieurs, des boutons permettent d'en changer (« · en cours »).
