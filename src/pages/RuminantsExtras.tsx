@@ -4,6 +4,8 @@ import { Courbe } from '../courbe';
 import { ajouteJours, fmtDate, fmtDec, fmtFcfa, joursEntre, today } from '../format';
 import { dataOf, useItems, useRole, type Item } from '../hooks';
 import { peutSupprimerSaisie } from '../droits';
+import { ActionsFiche } from '../ActionsFiche';
+import { nomDejaPris } from '../integrite';
 import { compresserPhoto } from '../photo';
 import { propositionsReforme, tachesAutomatiques } from '../ruminants/calculs';
 import { libelleAnimal, useRuminants } from '../ruminants/donnees';
@@ -211,6 +213,9 @@ export function ParcsListe({ peutCreer }: { peutCreer: boolean }) {
             <li key={p.id}>
               <div class="ligne"><strong>{p.nom}</strong><span class={`badge ${p.capacite > 0 && n > p.capacite ? 'rouge' : ''}`}>{n}{p.capacite > 0 ? ` / ${p.capacite}` : ''} animaux</span></div>
               {p.capacite > 0 && n > p.capacite && <small class="dette">Trop d'animaux pour ce parc</small>}
+              <ActionsFiche compact collection="parc" item={p} nom={p.nom} retour="/elevage"
+                champs={[{ cle: 'nom', label: 'Nom du parc', type: 'texte', requis: true }, { cle: 'capacite', label: 'Nombre d’animaux qu’il peut porter (0 = non précisé)', type: 'nombre', entier: true }, { cle: 'note', label: 'Note', type: 'texte' }]}
+                valider={(patch, g, id) => (nomDejaPris(g, 'parc', 'nom', String(patch.nom ?? ''), id) ? 'Un autre parc porte déjà ce nom.' : null)} />
             </li>
           );
         })}

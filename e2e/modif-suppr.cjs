@@ -26,6 +26,10 @@ const attendre = async (token, test, ms = 10000) => { const fin = Date.now() + m
     animal(ID.an1, '101'), animal(ID.an2, '202'), animal(ID.an3, '303'),
     entree(ID.e1, ID.an1), entree(ID.e2, ID.an2), entree(ID.e3, ID.an3),
     rec('pesee', { animalId: ID.an1, date: '2026-11-10', poids: 30, methode: 'balance' }, 'pesee-animal-101-1'),
+    rec('parc', { nom: 'Parc du bas-fond', capacite: 10, note: '' }, 'parc-occupe-0000001'),
+    rec('parc', { nom: 'Parc libre', capacite: 0, note: '' }, 'parc-libre-00000001'),
+    rec('lot', { nom: 'Lot parc', type: 'troupeau', espece: 'ovin', dateDebut: '2026-01-01', poidsObjectif: 0, dateObjectif: '' }, 'lot-parc-0000000001'),
+    rec('pature', { lotId: 'lot-parc-0000000001', parcId: 'parc-occupe-0000001', date: '2026-11-01', type: 'entree' }, 'pature-parc-00000001'),
     rec('bande', { nom: 'Bande 1', effectifInitial: 400, dateArrivee: '2026-10-01', ageArriveeSemaines: 0, batiment: '', souche: '', origine: '', prixAchat: 0 }, ID.b1),
     rec('ramassage', { bandeId: ID.b1, date: '2026-11-20', bons: 300, feles: 0, casses: 0 }, ID.r1),
     rec('mortalite', { bandeId: ID.b1, date: '2026-11-21', nombre: 5, type: 'mort', cause: '' }, 'mortalite-bande-1-1')
@@ -143,6 +147,23 @@ const attendre = async (token, test, ms = 10000) => { const fin = Date.now() + m
   s = await attendre(owner, (x) => x.find((r) => r.id === ID.an3)?.deleted === true && x.find((r) => r.id === ID.e3)?.deleted === true);
   ok(s.find((r) => r.id === ID.an3)?.deleted && s.find((r) => r.id === ID.e3)?.deleted, 'animal sans historique : supprimé avec son entrée au registre');
   ok(!s.find((r) => r.id === ID.an2)?.deleted, 'les autres animaux ne sont pas touchés');
+
+  // ---------- parcs ----------
+  await P.goto(BASE + '/#/moutons');
+  await P.getByText('Parc du bas-fond').waitFor();
+  const parc = (nom) => P.locator('li', { hasText: nom }).first();
+  await parc('Parc du bas-fond').getByRole('button', { name: 'Modifier' }).click();
+  await P.getByLabel(/Nombre d’animaux qu’il peut porter/).fill('25');
+  await P.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await P.getByText('Modifications enregistrées').waitFor();
+  s = await attendre(owner, (x) => x.find((r) => r.id === 'parc-occupe-0000001')?.data.capacite === 25);
+  ok(s.find((r) => r.id === 'parc-occupe-0000001').data.capacite === 25, 'parc : la capacité est modifiable (10 → 25)');
+  await parc('Parc du bas-fond').getByRole('button', { name: 'Supprimer' }).click();
+  await P.getByText(/Suppression impossible/).waitFor();
+  ok(/séjour/.test(await P.locator('p.erreur[role=alert]').first().innerText()), 'parc utilisé par un lot : suppression refusée');
+  await parc('Parc libre').getByRole('button', { name: 'Supprimer' }).click();
+  s = await attendre(owner, (x) => x.find((r) => r.id === 'parc-libre-00000001')?.deleted === true);
+  ok(s.find((r) => r.id === 'parc-libre-00000001')?.deleted === true, 'parc jamais utilisé : supprimé après confirmation');
 
   // ---------- bande ----------
   await P.goto(BASE + `/#/poules/${ID.b1}`);
