@@ -136,3 +136,7 @@ Avant de livrer : `npm run build` doit passer.
 - Carnet : chaque note a une date choisie (aujourd'hui par défaut, rétrosaisie signalée), triée par date, modifiable.
 - Réception de stock : bouton « Réception de stock » (ancien « Nouvel achat ») sur la page Stocks pour le propriétaire et le gérant (capacité `achats`) ; crée l'achat et l'entrée en stock.
 - Tests : `src/journalDiff.test.ts`, `e2e/modifications.cjs`.
+
+## Liste des alertes (étape 7, lot 14)
+- Les alertes restent affichées TANT QUE LE PROBLÈME EXISTE (choix du propriétaire : pas de bouton « vu », pas de report) ; elles disparaissent seules quand la donnée est corrigée. Ajouté : `src/pages/ListeAlertes.tsx` (`#/alertes`, Plus > Alertes, menu bureau) qui liste toutes les alertes en cours du profil (`useAlertes`), groupées par sorte avec leur nombre et un lien vers la page où les traiter. Sur les accueils (`Alertes lien`), 4 alertes au plus puis « Voir les N alertes » ; les autres écrans gardent la liste complète sans lien.
+- Test : `e2e/alertes.cjs`.

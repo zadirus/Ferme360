@@ -300,3 +300,10 @@ ul.diffs .avant { color: var(--terre); text-decoration: line-through; }
 ul.diffs .apres { color: var(--vert-fonce); font-weight: 800; }
 ul.diffs .fleche { color: var(--gris); }
 .supprime { color: var(--terre); }
+
+/* Liste des alertes */
+.toutes-alertes { display: inline-block; margin-top: 4px; font-weight: 800; color: #6b4d00; }
+.groupe-alertes { margin: 14px 0 18px; }
+.groupe-alertes ul { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 6px; }
+.groupe-alertes li { background: var(--ambre-clair); border: 1px solid #f0d58a; color: #6b4d00; font-weight: 600; box-shadow: none; }
+.compte-alertes { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 999px; background: var(--terre); color: #fff; font-size: .8rem; }

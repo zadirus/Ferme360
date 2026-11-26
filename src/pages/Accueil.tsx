@@ -109,7 +109,7 @@ export function Accueil() {
         <span>{dateLongue}</span>
       </div>
       {argent && <PremiersPas ok={premiersPas} />}
-      <Alertes liste={toutes} />
+      <Alertes liste={toutes} lien />
       <ul class="tuiles">
         <li>
           <a class="tuile" href="#/poules">

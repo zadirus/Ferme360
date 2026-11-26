@@ -7,6 +7,7 @@ import { peut, peutToutSupprimer } from './droits';
 import { appliquerReglages, ID_REGLAGES, type Reglages as TypeReglages } from './reglages';
 import { Equipe, Journal, MotDePasse, Plus } from './pages/Admin';
 import { Corbeille } from './pages/Corbeille';
+import { ListeAlertes } from './pages/ListeAlertes';
 import { AccueilAgent, AccueilVeto, SaisieAliment, SaisieDeces, SaisieHistorique, SaisieOeufs, SaisiePesee, SaisieSoin } from './pages/Agent';
 import { Rapports } from './pages/Rapports';
 import { Notifications } from './pages/Notifications';
@@ -45,6 +46,7 @@ const ONGLETS: Array<[string, string, string]> = [
 const MENU_BUREAU: Array<{ section?: string; chemin: string; texte: string; icone: string }> = [
   { chemin: '/', texte: 'Accueil', icone: '🏠' },
   { chemin: '/tableau', texte: 'Tableau de bord', icone: '📊' },
+  { chemin: '/alertes', texte: 'Alertes', icone: '⚠️' },
   { section: 'Activités', chemin: '/elevage', texte: 'Élevage', icone: '🐾' },
   { chemin: '/ventes', texte: 'Ventes et clients', icone: '🧾' },
   { chemin: '/stocks', texte: 'Stocks', icone: '📦' },
@@ -67,7 +69,7 @@ const FAMILLES: Record<string, string[]> = {
   '/elevage': ['/elevage', '/poules', '/oeufs', '/moutons', '/boeufs', '/animaux', '/lots'],
   '/ventes': ['/ventes', '/clients'],
   '/stocks': ['/stocks'],
-  '/plus': ['/plus', '/argent', '/rapports', '/tableau', '/equipe', '/journal', '/corbeille', '/reglages', '/sauvegarde', '/import', '/notifications', '/pin', '/mdp', '/aide', '/carnet']
+  '/plus': ['/plus', '/argent', '/rapports', '/tableau', '/equipe', '/journal', '/corbeille', '/alertes', '/reglages', '/sauvegarde', '/import', '/notifications', '/pin', '/mdp', '/aide', '/carnet']
 };
 
 // Accès aux pages selon le profil (le serveur applique de toute façon les mêmes droits)
@@ -151,6 +153,7 @@ export function App() {
   else if (route === '/equipe') page = <Equipe />;
   else if (route === '/journal') page = <Journal />;
   else if (route === '/corbeille') page = <Corbeille />;
+  else if (route === '/alertes') page = <ListeAlertes />;
   else if (route === '/reglages') page = <Reglages />;
   else if (route === '/sauvegarde') page = <Sauvegarde />;
   else if (route === '/rapports') page = <Rapports />;

@@ -229,7 +229,7 @@ export function AccueilAgent() {
         <strong>Bonjour{prenom ? `, ${prenom}` : ''}</strong>
         <span>{dateLongue}</span>
       </div>
-      <Alertes liste={alertes.map((a) => a.texte)} />
+      <Alertes liste={alertes.map((a) => a.texte)} lien />
       <ul class="gros-boutons">
         {bouton('/saisie/oeufs', '🥚', 'Ramasser les œufs', 'oeuf')}
         {bouton('/saisie/deces', '💀', 'Signaler un décès', 'deces')}
@@ -564,7 +564,7 @@ export function AccueilVeto() {
         <strong>Bonjour{prenom ? `, ${prenom}` : ''}</strong>
         <span>{dateLongue}</span>
       </div>
-      <Alertes liste={alertes.map((a) => a.texte)} />
+      <Alertes liste={alertes.map((a) => a.texte)} lien />
       <ul class="gros-boutons">
         {bouton('/saisie/soin', '💊', 'Soigner, donner un médicament', 'soin')}
         {bouton('/saisie/liste/soin', '📋', 'Mes soins')}

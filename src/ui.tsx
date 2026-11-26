@@ -91,13 +91,17 @@ export function Stat({ valeur, label }: { valeur: ComponentChildren; label: stri
   );
 }
 
-export function Alertes({ liste }: { liste: string[] }) {
+// Les alertes restent affichées tant qu'elles ne sont pas levées. Sur l'accueil on en montre quelques-unes
+// (`max`) et un lien ouvre la liste complète.
+export function Alertes({ liste, max = 4, lien = false }: { liste: string[]; max?: number; lien?: boolean }) {
   if (!liste.length) return null;
+  const vues = lien ? liste.slice(0, max) : liste;
   return (
     <div class="alertes" role="alert">
-      {liste.map((a) => (
+      {vues.map((a) => (
         <p key={a}>⚠ {a}</p>
       ))}
+      {lien && <a class="toutes-alertes" href="#/alertes">{liste.length > max ? `Voir les ${liste.length} alertes →` : 'Liste des alertes →'}</a>}
     </div>
   );
 }
