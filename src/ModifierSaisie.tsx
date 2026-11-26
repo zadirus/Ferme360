@@ -63,7 +63,7 @@ export function specModification(collection: string, simple = false): SpecModifi
       };
     case 'aliment':
       return {
-        champs: [date, { cle: 'kg', label: 'Quantité distribuée', type: 'nombre', suffixe: 'kg', requis: true }, { cle: 'type', label: 'Type d’aliment', type: 'choix', options: [['ponte', 'Ponte'], ['croissance', 'Croissance'], ['demarrage', 'Démarrage']] }],
+        champs: [date, { cle: 'kg', label: 'Quantité distribuée', type: 'nombre', suffixe: 'kg', requis: true }, { cle: 'type', label: 'Type d’aliment', type: 'choix', options: [['ponte', 'Ponte'], ['croissance', 'Croissance'], ['demarrage', 'Démarrage']] }, { cle: 'note', label: 'Remarque', type: 'texte' }],
         valider: (p) => dateOk(p) ?? (Number(p.kg) <= 0 ? 'Indiquez la quantité.' : null),
         // la sortie de stock liée suit la nouvelle quantité et la nouvelle date
         apres: async (p, ancien, g) => {

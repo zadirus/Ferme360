@@ -97,7 +97,7 @@ export function BandeDetail({ id }: { id: string }) {
     })),
     ...aliments.map((a) => ({
       id: a.id, item: a, collection: 'aliment', date: a.date, updatedAt: a.updatedAt, auteur: a.author,
-      texte: `Aliment ${a.type} : ${fmtDec(a.kg)} kg${argent && coutDistribution(a, articlesTous, achatsTous) ? ` · ${fmtFcfa(coutDistribution(a, articlesTous, achatsTous))}` : ''}`,
+      texte: `Aliment ${a.type} : ${fmtDec(a.kg)} kg${argent && coutDistribution(a, articlesTous, achatsTous) ? ` · ${fmtFcfa(coutDistribution(a, articlesTous, achatsTous))}` : ''}${a.note ? ` · ${a.note}` : ''}`,
       supprimer: async () => {
         if (!window.confirm('Supprimer cette saisie ? Le stock d’aliment sera rétabli.')) return;
         await saveRecord('aliment', a.id, dataOf(a), true);
@@ -301,6 +301,7 @@ function AlimentForm({ bandeId, onFini }: FormProps) {
   const [type, setType] = useState<Aliment['type']>('ponte');
   const [kg, setKg] = useState('');
   const [articleId, setArticleId] = useState('');
+  const [note, setNote] = useState('');
   const article = articles.find((a) => a.id === articleId);
   async function envoyer(e: Event) {
     e.preventDefault();
@@ -313,7 +314,7 @@ function AlimentForm({ bandeId, onFini }: FormProps) {
     }
     const alimentId = newId();
     const cout = article ? Math.round(unites * coutMoyen(article.id, achats)) : 0;
-    await saveRecord('aliment', alimentId, { bandeId, date, kg: q, type, ...(article ? { articleId: article.id, cout } : {}) } satisfies Aliment);
+    await saveRecord('aliment', alimentId, { bandeId, date, kg: q, type, ...(article ? { articleId: article.id, cout } : {}), ...(note.trim() ? { note: note.trim() } : {}) } satisfies Aliment);
     if (article) {
       await saveRecord('stock_mvt', newId(), { articleId: article.id, date, type: 'sortie', quantite: unites, peremption: '', achatId: '', alimentId, note: '' } satisfies StockMvt);
     }
@@ -326,6 +327,7 @@ function AlimentForm({ bandeId, onFini }: FormProps) {
       <Choix label="Pris dans le stock" value={articleId} onChange={setArticleId} options={[['', 'Sans suivi de stock'], ...articles.map((a) => [a.id, a.nom] as [string, string])]} />
       <Champ label="Quantité distribuée" type="number" min={0} value={kg} onChange={setKg} suffixe="kg" required />
       <Champ label="Date" type="date" max={today()} value={date} onChange={setDate} required />
+      <Champ label="Remarque (facultatif)" value={note} onChange={setNote} />
       <Boutons onAnnuler={() => onFini('')} />
     </form>
   );
