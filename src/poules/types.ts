@@ -36,6 +36,7 @@ export interface Aliment {
   type: 'demarrage' | 'croissance' | 'ponte';
   articleId?: string; // article du stock d'aliment utilisé
   cout?: number; // coût en FCFA au moment de la distribution
+  note?: string; // remarque libre (ex. « estimation »)
 }
 
 export interface Sante {
